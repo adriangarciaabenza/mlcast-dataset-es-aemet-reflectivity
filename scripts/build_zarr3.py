@@ -1,0 +1,31 @@
+from pathlib import Path
+
+from mlcast_dataset_es_aemet_reflectivity.pipeline_zarr3 import (
+    RadarBuildConfigZarr3,
+    run_pipeline_zarr3,
+)
+
+
+if __name__ == "__main__":
+    config = RadarBuildConfigZarr3(
+        workdir=Path("./workdir_zarr3"),
+        zarr_out=Path("./ES-AEMET-radar_reflectivity-ppi_ZAR_v3.zarr"),
+        fechaini="20241001T000000",
+        fechafin="20241002T000000",
+        imagen="PPI",
+        configuracion="Z_005_240",
+        radar="ZAR",
+        epsg="4326",
+        var_name="equivalent_reflectivity_factor",
+        standard_name="equivalent_reflectivity_factor",
+        mlcast_created_by="Adrián García <agarciaa@aemet.es>",
+        mlcast_created_with="https://github.com/mlcast-community/mlcast-dataset-ES-AEMET-reflectivity@v0.1.0",
+        mlcast_dataset_version="0.1.0",
+        mlcast_dataset_identifier="ES-AEMET-radar_reflectivity-ppi_ZAR",
+        mlcast_dataset_identifier_format="{country_code}-{entity}-{physical_variable}-{common_name}",
+        compression_level=5,
+        time_chunk=1,
+        shard_time=144,
+        inspect=False,
+    )
+    run_pipeline_zarr3(config)

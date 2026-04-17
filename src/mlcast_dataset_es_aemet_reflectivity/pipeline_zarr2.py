@@ -11,11 +11,12 @@ import requests
 import xarray as xr
 
 from .data_handler import download_radar_data
-from .radar_to_zarr import (
-    build_radar_zarr_from_nc_files,
-    clean_dir,
-    find_nc_files,
+from .utils import clean_dir, find_nc_files
+from .radar_processing import build_radar_zarr_from_nc_files
+from .radar_inspection import (
     inspect_radar_dataset_in_memory,
+    inspect_raw_radar_dataset,
+    inspect_radar_state,
 )
 
 
@@ -46,7 +47,11 @@ class RadarBuildConfig:
     compressor_name: str = "zstd"
     compression_level: int = 5
     blosc_shuffle: str = "bitshuffle"
-    force_zarr_v2: bool = True
+
+    zarr_format: int = 2
+    time_chunk: int = 1
+    use_sharding: bool = False
+    shard_time: int | None = None
 
     max_retries_429: int = 8
     initial_wait_429: int = 15
@@ -85,34 +90,27 @@ def write_ds_to_zarr_v2(
     store: str | Path,
     mode: str,
     append_dim: str | None = None,
-    force_zarr_v2: bool = True,
 ) -> None:
     store = Path(store)
     kwargs = {"store": store, "mode": mode}
     if append_dim is not None:
         kwargs["append_dim"] = append_dim
 
-    if force_zarr_v2:
-        try:
-            ds.to_zarr(**kwargs, zarr_version=2)
-            return
-        except TypeError:
-            ds.to_zarr(**kwargs, zarr_format=2)
-            return
-
-    ds.to_zarr(**kwargs)
+    try:
+        ds.to_zarr(**kwargs, zarr_version=2)
+    except TypeError:
+        ds.to_zarr(**kwargs, zarr_format=2)
 
 
 def append_chunk_zarr_to_final(
     chunk_zarr_path: str | Path,
     final_zarr_path: str | Path,
     first_chunk: bool,
-    force_zarr_v2: bool = True,
 ) -> bool:
     chunk_zarr_path = Path(chunk_zarr_path)
     final_zarr_path = Path(final_zarr_path)
 
-    ds_chunk = xr.open_zarr(chunk_zarr_path, consolidated=False)
+    ds_chunk = xr.open_zarr(chunk_zarr_path, consolidated=True)
     ds_chunk = ds_chunk.load()
 
     if "time" in ds_chunk.indexes:
@@ -120,11 +118,11 @@ def append_chunk_zarr_to_final(
 
     try:
         if first_chunk:
-            write_ds_to_zarr_v2(ds_chunk, final_zarr_path, mode="w", force_zarr_v2=force_zarr_v2)
+            write_ds_to_zarr_v2(ds_chunk, final_zarr_path, mode="w")
             print(f"[OK] Creado Zarr final con el primer chunk: {final_zarr_path}")
             return False
 
-        write_ds_to_zarr_v2(ds_chunk, final_zarr_path, mode="a", append_dim="time", force_zarr_v2=force_zarr_v2)
+        write_ds_to_zarr_v2(ds_chunk, final_zarr_path, mode="a", append_dim="time")
         print(f"[OK] Chunk añadido al Zarr final: {final_zarr_path}")
         return False
     finally:
@@ -195,6 +193,12 @@ def run_pipeline(config: RadarBuildConfig) -> None:
     if dt_fin <= dt_ini:
         raise ValueError("fechafin debe ser posterior a fechaini.")
 
+    if config.zarr_format != 2:
+        raise NotImplementedError(
+            "Este pipeline incremental por append está preparado para Zarr v2. "
+            "Para v3 con sharding conviene escribir el store final directamente."
+        )
+
     first_chunk = True
     n_chunks_ok = 0
     n_chunks_empty = 0
@@ -245,13 +249,19 @@ def run_pipeline(config: RadarBuildConfig) -> None:
                 compressor_name=config.compressor_name,
                 compression_level=config.compression_level,
                 blosc_shuffle=config.blosc_shuffle,
+                zarr_format=config.zarr_format,
+                time_chunk=config.time_chunk,
+                use_sharding=config.use_sharding,
+                shard_time=config.shard_time,
+                inspect=False,
+                inspect_raw_fn=inspect_raw_radar_dataset,
+                inspect_state_fn=inspect_radar_state,
             )
 
             first_chunk = append_chunk_zarr_to_final(
                 chunk_zarr_path=chunk_zarr,
                 final_zarr_path=config.zarr_out,
                 first_chunk=first_chunk,
-                force_zarr_v2=config.force_zarr_v2,
             )
             n_chunks_ok += 1
         except Exception as exc:
