@@ -10,7 +10,7 @@ if __name__ == "__main__":
         png_out=Path("./radar_quicklook.png"),
         png_out_cartopy=Path("./radar_quicklook_cartopy.png"),
         fechaini="20241001T000000",
-        fechafin="20241001T020000",
+        fechafin="20241002T000000",
         imagen="PPI",
         configuracion="Z_005_240",
         radar="ZAR",
