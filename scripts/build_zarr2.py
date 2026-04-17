@@ -1,12 +1,15 @@
 from pathlib import Path
 
-from mlcast_dataset_es_aemet_reflectivity.pipeline import RadarBuildConfig, run_pipeline
+from mlcast_dataset_es_aemet_reflectivity.pipeline_zarr2 import (
+    RadarBuildConfig,
+    run_pipeline,
+)
 
 
 if __name__ == "__main__":
     config = RadarBuildConfig(
-        workdir=Path("./workdir"),
-        zarr_out=Path("./ES-AEMET-radar_reflectivity-ppi_ZAR.zarr"),
+        workdir=Path("./workdir_zarr2"),
+        zarr_out=Path("./ES-AEMET-radar_reflectivity-ppi_ZAR_v2.zarr"),
         png_out=Path("./radar_quicklook.png"),
         png_out_cartopy=Path("./radar_quicklook_cartopy.png"),
         fechaini="20241001T000000",
@@ -25,6 +28,9 @@ if __name__ == "__main__":
         compressor_name="zstd",
         compression_level=5,
         blosc_shuffle="bitshuffle",
-        force_zarr_v2=True,
+        zarr_format=2,
+        time_chunk=1,
+        use_sharding=False,
+        shard_time=None,
     )
     run_pipeline(config)
