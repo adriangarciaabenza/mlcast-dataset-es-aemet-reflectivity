@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlcast-dataset-es-aemet-reflectivity"
+version = "0.1.0"
+description = "Conversion pipeline for AEMET radar reflectivity products to MLCAST-style Zarr datasets"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Adrián García" }
+]
+dependencies = [
+  "matplotlib",
+  "numcodecs",
+  "numpy",
+  "pyproj",
+  "requests",
+  "xarray",
+  "zarr",
+  "netcdf4",
+  "h5netcdf",
+  "dask",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
