@@ -20,3 +20,6 @@ workdir*/
 # IDE
 .vscode/
 .idea/
+
+logs/*
+!logs/.gitkeep

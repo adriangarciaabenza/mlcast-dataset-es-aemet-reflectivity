@@ -25,7 +25,7 @@ institution: "Agencia Estatal de Meteorología (AEMET)"
 source: "AEMET radar network"
 attribution: "Data provided by AEMET"
 
-compression_level: 5
+compression_level: 12
 time_chunk: 1
 shard_time: 144
 inspect: false

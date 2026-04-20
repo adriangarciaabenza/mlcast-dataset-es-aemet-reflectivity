@@ -1,0 +1,61 @@
+#!/bin/bash
+#SBATCH --job-name=build_zarr_v3
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=64G
+#SBATCH --time=72:00:00
+#SBATCH --output=/perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity/logs/log_build_zarr_%j.out
+#SBATCH --error=/perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity/logs/log_build_zarr_%j.err
+
+# =============================================================================
+# ENTORNO
+# =============================================================================
+
+echo "=== JOB START ==="
+date
+hostname
+
+# Cargar entorno (IMPORTANTE en tu sistema)
+source /etc/profile
+
+# Activa tu entorno
+source /perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity/.venv/bin/activate
+
+echo "Python ejecutándose desde:"
+which python
+python --version
+
+# =============================================================================
+# VARIABLES
+# =============================================================================
+
+PROJECT_DIR=/perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity
+CONFIG=${PROJECT_DIR}/configs/default_v3.yaml
+
+# API KEY AEMET
+export AEMET_API_KEY="TU_API_KEY"
+
+# Para logs en tiempo real
+export PYTHONUNBUFFERED=1
+
+# =============================================================================
+# EJECUCIÓN
+# =============================================================================
+
+cd ${PROJECT_DIR}
+
+echo "=== CONFIG ==="
+cat ${CONFIG}
+
+echo "=== RUN BUILD_ZARR ==="
+
+python scripts/build_zarr.py \
+    --config ${CONFIG}
+
+EXIT_CODE=$?
+
+echo "=== JOB END ==="
+date
+echo "Exit code: ${EXIT_CODE}"
+
+exit ${EXIT_CODE}
