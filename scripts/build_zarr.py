@@ -69,6 +69,14 @@ DEFAULTS: dict[str, Any] = {
     ),
 
     # -------------------------------------------------------------------------
+    # LICENSE / ATTRIBUTION
+    # -------------------------------------------------------------------------
+    "license": "CC-BY-4.0",
+    "institution": "Agencia Estatal de Meteorología (AEMET)",
+    "source": "AEMET radar network",
+    "attribution": "Data provided by AEMET",
+
+    # -------------------------------------------------------------------------
     # Compression / chunking
     # -------------------------------------------------------------------------
     "compression_level": 5,
@@ -182,6 +190,10 @@ def build_config_v2(cfg: dict[str, Any]) -> RadarBuildConfigV2:
         mlcast_dataset_version=cfg["mlcast_dataset_version"],
         mlcast_dataset_identifier=cfg["mlcast_dataset_identifier"],
         mlcast_dataset_identifier_format=cfg["mlcast_dataset_identifier_format"],
+        license=cfg["license"],
+        institution=cfg["institution"],
+        source=cfg["source"],
+        attribution=cfg["attribution"],
         compressor_name=cfg["compressor_name"],
         compression_level=int(cfg["compression_level"]),
         blosc_shuffle=cfg["blosc_shuffle"],
@@ -209,6 +221,10 @@ def build_config_v3(cfg: dict[str, Any]) -> RadarBuildConfigV3:
         mlcast_dataset_version=cfg["mlcast_dataset_version"],
         mlcast_dataset_identifier=cfg["mlcast_dataset_identifier"],
         mlcast_dataset_identifier_format=cfg["mlcast_dataset_identifier_format"],
+        license=cfg["license"],
+        institution=cfg["institution"],
+        source=cfg["source"],
+        attribution=cfg["attribution"],
         compression_level=int(cfg["compression_level"]),
         time_chunk=int(cfg["time_chunk"]),
         shard_time=int(cfg["shard_time"]),
@@ -271,6 +287,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mlcast_dataset_version", type=str, default=None)
     parser.add_argument("--mlcast_dataset_identifier", type=str, default=None)
     parser.add_argument("--mlcast_dataset_identifier_format", type=str, default=None)
+
+    parser.add_argument("--license", type=str, default=None)
+    parser.add_argument("--institution", type=str, default=None)
+    parser.add_argument("--source", type=str, default=None)
+    parser.add_argument("--attribution", type=str, default=None)
 
     parser.add_argument("--compression_level", type=int, default=None)
     parser.add_argument("--time_chunk", type=int, default=None)

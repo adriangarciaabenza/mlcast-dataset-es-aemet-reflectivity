@@ -22,6 +22,11 @@ mlcast_dataset_version: "test"
 mlcast_dataset_identifier: "ES-AEMET-radar_reflectivity-ppi_ZAR_TEST"
 mlcast_dataset_identifier_format: "{country_code}-{entity}-{physical_variable}-{common_name}"
 
+license: "CC-BY-4.0"
+institution: "Agencia Estatal de Meteorología (AEMET)"
+source: "AEMET radar network"
+attribution: "Data provided by AEMET"
+
 compressor_name: "zstd"
 compression_level: 1
 blosc_shuffle: "bitshuffle"
