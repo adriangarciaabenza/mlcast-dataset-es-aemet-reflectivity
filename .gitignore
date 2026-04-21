@@ -23,3 +23,7 @@ workdir*/
 
 logs/*
 !logs/.gitkeep
+
+configs/*
+!configs/tests
+!configs/default*
