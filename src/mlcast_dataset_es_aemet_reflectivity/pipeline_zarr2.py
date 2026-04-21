@@ -44,6 +44,11 @@ class RadarBuildConfig:
     mlcast_dataset_identifier: str = "ES-AEMET-radar_reflectivity-ppi_ZAR"
     mlcast_dataset_identifier_format: str = "{country_code}-{entity}-{physical_variable}-{common_name}"
 
+    license: str = "CC-BY-4.0"
+    institution: str = "Agencia Estatal de Meteorología (AEMET)"
+    source: str = "AEMET radar network"
+    attribution: str = "Data provided by AEMET"
+
     compressor_name: str = "zstd"
     compression_level: int = 5
     blosc_shuffle: str = "bitshuffle"

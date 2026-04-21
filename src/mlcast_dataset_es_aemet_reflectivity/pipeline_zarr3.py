@@ -49,6 +49,11 @@ class RadarBuildConfigZarr3:
     mlcast_dataset_identifier: str = "ES-AEMET-radar_reflectivity-ppi_ZAR"
     mlcast_dataset_identifier_format: str = "{country_code}-{entity}-{physical_variable}-{common_name}"
 
+    license: str = "CC-BY-4.0"
+    institution: str = "Agencia Estatal de Meteorología (AEMET)"
+    source: str = "AEMET radar network"
+    attribution: str = "Data provided by AEMET"
+
     compression_level: int = 5
     time_chunk: int = 1
     shard_time: int = 144
@@ -185,11 +190,24 @@ def _initialize_v3_store_from_template(
     compression_level: int,
     time_chunk: int,
     shard_time: int,
+    license_name: str,
+    institution: str,
+    source: str,
+    attribution: str,
 ) -> tuple[zarr.Group, zarr.Array, zarr.Array]:
     zarr_path = Path(zarr_path)
     store = _open_local_store(zarr_path)
     root = zarr.group(store=store, overwrite=True, zarr_format=3)
+    
     root.attrs.update(dict(ds_template.attrs))
+    
+    # license metadata
+    root.attrs.update({
+        "license": license_name,
+        "institution": institution,
+        "source": source,
+        "attribution": attribution,
+    })
 
     compressors = build_zarr_v3_compressors(compression_level=compression_level)
 
@@ -368,6 +386,10 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
                 ds_chunk,
                 var_name=config.var_name,
                 epsg=config.epsg,
+                institution=config.institution,
+                source=config.source,
+                license_name=config.license,
+                attribution=config.attribution,
                 mlcast_created_by=config.mlcast_created_by,
                 mlcast_created_with=config.mlcast_created_with,
                 mlcast_dataset_version=config.mlcast_dataset_version,
@@ -400,6 +422,10 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
                     compression_level=config.compression_level,
                     time_chunk=config.time_chunk,
                     shard_time=config.shard_time,
+                    license_name=config.license,
+                    institution=config.institution,
+                    source=config.source,
+                    attribution=config.attribution,
                 )
                 print(f"[OK] Inicializado store Zarr v3 sharded: {config.zarr_out}")
 
