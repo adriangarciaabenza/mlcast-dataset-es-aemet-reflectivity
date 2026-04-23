@@ -39,8 +39,8 @@ def parse_time_or_none(value: str | None) -> str | None:
         pd.to_datetime(value)
     except Exception as e:
         raise argparse.ArgumentTypeError(
-            f"Valor temporal no válido: {value!r}. "
-            f"Usa formatos como '2020-01-01' o '2020-01-01T12:00:00'."
+            f"Invalid time value: {value!r}. "
+            f"Use formats such as '2020-01-01' or '2020-01-01T12:00:00'."
         ) from e
 
     return value
@@ -48,44 +48,44 @@ def parse_time_or_none(value: str | None) -> str | None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Genera un GIF animado a partir de un Zarr de radar."
+        description="Generate an animated GIF from a radar Zarr dataset."
     )
 
     parser.add_argument(
         "--zarr-path",
         type=Path,
         default=DEFAULT_ZARR_PATH,
-        help="Ruta al dataset Zarr.",
+        help="Path to the Zarr dataset.",
     )
     parser.add_argument(
         "--var-name",
         type=str,
         default=DEFAULT_VAR_NAME,
-        help="Nombre de la variable a representar.",
+        help="Name of the variable to display.",
     )
     parser.add_argument(
         "--output-gif",
         type=Path,
         default=DEFAULT_OUTPUT_GIF,
-        help="Ruta del GIF de salida.",
+        help="Path to the output GIF.",
     )
     parser.add_argument(
         "--start-time",
         type=parse_time_or_none,
         default=None,
-        help="Tiempo inicial. Ejemplos: '2020-01-01' o '2020-01-01T12:00:00'.",
+        help="Start time. Examples: '2020-01-01' or '2020-01-01T12:00:00'.",
     )
     parser.add_argument(
         "--end-time",
         type=parse_time_or_none,
         default=None,
-        help="Tiempo final. Ejemplos: '2020-01-01' o '2020-01-01T18:00:00'.",
+        help="End time. Examples: '2020-01-01' or '2020-01-01T18:00:00'.",
     )
     parser.add_argument(
         "--fps",
         type=int,
         default=DEFAULT_FPS,
-        help="Frames por segundo del GIF.",
+        help="GIF frames per second.",
     )
 
     latlon_group = parser.add_mutually_exclusive_group()
@@ -93,64 +93,64 @@ def build_parser() -> argparse.ArgumentParser:
         "--use-latlon",
         dest="use_latlon",
         action="store_true",
-        help="Usar lon/lat en el plot básico.",
+        help="Use lon/lat in the basic plot.",
     )
     latlon_group.add_argument(
         "--no-use-latlon",
         dest="use_latlon",
         action="store_false",
-        help="No usar lon/lat; representar en coordenadas índice.",
+        help="Do not use lon/lat; plot in index coordinates instead.",
     )
     parser.set_defaults(use_latlon=DEFAULT_USE_LATLON)
 
     parser.add_argument(
         "--use-cartopy",
         action="store_true",
-        help="Representar con Cartopy.",
+        help="Plot with Cartopy.",
     )
 
     # -------------------------------------------------------------------------
-    # Líneas administrativas / provincias
+    # Administrative lines / provinces
     # -------------------------------------------------------------------------
     parser.add_argument(
         "--draw-provinces",
         action="store_true",
         help=(
-            "Superponer líneas administrativas internas de Natural Earth "
-            "(vía Cartopy)."
+            "Overlay internal administrative lines from Natural Earth "
+            "(via Cartopy)."
         ),
     )
     parser.add_argument(
         "--draw-shapefile",
         action="store_true",
-        help="Superponer un shapefile externo cualquiera.",
+        help="Overlay any external shapefile.",
     )
     parser.add_argument(
         "--shapefile-path",
         type=Path,
         default=None,
-        help="Ruta al shapefile externo (.shp).",
+        help="Path to the external shapefile (.shp).",
     )
     parser.add_argument(
         "--shapefile-edgecolor",
         type=str,
         default="white",
-        help="Color del borde del shapefile externo.",
+        help="Edge color for the external shapefile.",
     )
     parser.add_argument(
         "--shapefile-linewidth",
         type=float,
         default=0.6,
-        help="Grosor de línea del shapefile externo.",
+        help="Line width for the external shapefile.",
     )
 
     # -------------------------------------------------------------------------
-    # Orografía
+    # Orography
     # -------------------------------------------------------------------------
     parser.add_argument(
         "--draw-orography",
         action="store_true",
-        help="Superponer orografía.",
+        help="Overlay orography.",
     )
     parser.add_argument(
         "--orography-mode",
@@ -158,10 +158,10 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["default", "file", "shapefile"],
         default="default",
         help=(
-            "Modo de orografía: "
-            "'default' = capa física por defecto de Cartopy, "
-            "'file' = raster/NetCDF externo, "
-            "'shapefile' = shapefile externo."
+            "Orography mode: "
+            "'default' = Cartopy default physical layer, "
+            "'file' = external raster/NetCDF, "
+            "'shapefile' = external shapefile."
         ),
     )
 
@@ -169,32 +169,32 @@ def build_parser() -> argparse.ArgumentParser:
         "--orography-file",
         type=Path,
         default=None,
-        help="Ruta a archivo NetCDF/raster con orografía.",
+        help="Path to a NetCDF/raster file with orography.",
     )
     parser.add_argument(
         "--orography-var",
         type=str,
         default="orography",
-        help="Nombre de la variable de orografía en el archivo externo.",
+        help="Name of the orography variable in the external file.",
     )
 
     parser.add_argument(
         "--orography-shapefile",
         type=Path,
         default=None,
-        help="Ruta a shapefile externo para orografía/relieve.",
+        help="Path to an external shapefile for orography/relief.",
     )
     parser.add_argument(
         "--orography-edgecolor",
         type=str,
         default="white",
-        help="Color del borde para la orografía en modo shapefile.",
+        help="Edge color for orography in shapefile mode.",
     )
     parser.add_argument(
         "--orography-linewidth",
         type=float,
         default=0.5,
-        help="Grosor de línea para la orografía en modo shapefile.",
+        help="Line width for orography in shapefile mode.",
     )
 
     return parser
@@ -210,7 +210,7 @@ def detect_zarr_format(path: Path) -> int:
 
 def open_radar_zarr(path: Path) -> xr.Dataset:
     zarr_format = detect_zarr_format(path)
-    print(f"Abrir Zarr v{zarr_format}: {path}")
+    print(f"Opening Zarr v{zarr_format}: {path}")
 
     if zarr_format == 3:
         return xr.open_zarr(path, consolidated=None, zarr_format=3)
@@ -236,7 +236,7 @@ def get_radar_cmap():
         "#ffbb00",  # 54-60
         "#ff7f00",  # 60-66
         "#ff0000",  # 66-72
-        "#C8005A",  # 72-78 y >78
+        "#C8005A",  # 72-78 and >78
     ]
 
     cmap = ListedColormap(colors)
@@ -254,7 +254,7 @@ def get_radar_cmap():
 
 def add_default_admin1_lines(ax, scale: str = "10m") -> None:
     """
-    Líneas administrativas internas por defecto de Natural Earth/Cartopy.
+    Default internal administrative lines from Natural Earth/Cartopy.
     """
     feature = cfeature.NaturalEarthFeature(
         category="cultural",
@@ -278,11 +278,11 @@ def add_shapefile(
     zorder: int = 4,
 ) -> None:
     if shapefile_path is None:
-        print("Aviso: se pidió un shapefile pero no se proporcionó ruta.")
+        print("Warning: a shapefile was requested but no path was provided.")
         return
 
     if not shapefile_path.exists():
-        print(f"Aviso: no existe el shapefile: {shapefile_path}")
+        print(f"Warning: shapefile does not exist: {shapefile_path}")
         return
 
     feature = ShapelyFeature(
@@ -297,8 +297,8 @@ def add_shapefile(
 
 def add_default_orography(ax, scale: str = "10m") -> None:
     """
-    Añade una capa física general de relieve por defecto de Natural Earth.
-    No es orografía raster detallada; es una referencia física vectorial.
+    Add a default general physical relief layer from Natural Earth.
+    This is not a detailed raster orography; it is a vector physical reference.
     """
     try:
         feature = cfeature.NaturalEarthFeature(
@@ -315,7 +315,7 @@ def add_default_orography(ax, scale: str = "10m") -> None:
             zorder=3,
         )
     except Exception as e:
-        print(f"Aviso: no se pudo añadir la orografía por defecto: {e}")
+        print(f"Warning: could not add default orography: {e}")
 
 
 def add_orography_from_file(
@@ -324,11 +324,11 @@ def add_orography_from_file(
     var_name: str = "orography",
 ) -> None:
     if orography_file is None:
-        print("Aviso: se pidió orografía desde archivo pero no se pasó ruta.")
+        print("Warning: file-based orography was requested but no path was provided.")
         return
 
     if not orography_file.exists():
-        print(f"Aviso: no existe el archivo de orografía: {orography_file}")
+        print(f"Warning: orography file does not exist: {orography_file}")
         return
 
     ds_oro = xr.open_dataset(orography_file)
@@ -336,7 +336,7 @@ def add_orography_from_file(
     if var_name not in ds_oro:
         ds_oro.close()
         raise KeyError(
-            f"La variable de orografía {var_name!r} no existe en {orography_file}"
+            f"Orography variable {var_name!r} does not exist in {orography_file}"
         )
 
     oro = ds_oro[var_name]
@@ -347,8 +347,8 @@ def add_orography_from_file(
     if lon_name not in oro.coords or lat_name not in oro.coords:
         ds_oro.close()
         raise KeyError(
-            "No se encontraron coordenadas lon/lat o longitude/latitude "
-            "en el archivo de orografía."
+            "lon/lat or longitude/latitude coordinates were not found "
+            "in the orography file."
         )
 
     ax.contour(
@@ -392,7 +392,7 @@ def add_orography(
             zorder=3,
         )
     else:
-        raise ValueError(f"Modo de orografía no reconocido: {mode}")
+        raise ValueError(f"Unknown orography mode: {mode}")
 
 
 # =============================================================================
@@ -425,7 +425,7 @@ def plot_frame_cartopy(
 
     if "lon" not in ds or "lat" not in ds:
         raise KeyError(
-            "Para usar Cartopy necesitas coordenadas 'lon' y 'lat' en el dataset."
+            "Using Cartopy requires 'lon' and 'lat' coordinates in the dataset."
         )
 
     mesh = ax.pcolormesh(
@@ -501,7 +501,7 @@ def plot_frame_cartopy(
         extend="max",
     )
 
-    cbar.set_label("Reflectividad (dBZ)", color="white")
+    cbar.set_label("Reflectivity (dBZ)", color="white")
     cbar.ax.xaxis.set_tick_params(color="white")
     plt.setp(cbar.ax.get_xticklabels(), color="white")
     cbar.outline.set_edgecolor("white")
@@ -524,7 +524,7 @@ def plot_frame_basic(
     if use_latlon:
         if "lon" not in ds or "lat" not in ds:
             raise KeyError(
-                "Se pidió usar lon/lat pero el dataset no contiene 'lon' y 'lat'."
+                "lon/lat plotting was requested, but the dataset does not contain 'lon' and 'lat'."
             )
 
         mesh = ax.pcolormesh(
@@ -565,7 +565,7 @@ def plot_frame_basic(
         extend="max",
     )
 
-    cbar.set_label("Reflectividad (dBZ)", color="white")
+    cbar.set_label("Reflectivity (dBZ)", color="white")
     cbar.ax.xaxis.set_tick_params(color="white")
     plt.setp(cbar.ax.get_xticklabels(), color="white")
     cbar.outline.set_edgecolor("white")
@@ -600,12 +600,12 @@ def create_radar_gif(
     orography_linewidth: float = 0.5,
 ) -> None:
     if var_name not in ds:
-        raise KeyError(f"La variable {var_name!r} no existe en el dataset.")
+        raise KeyError(f"Variable {var_name!r} does not exist in the dataset.")
 
     da = ds[var_name]
 
     if "time" not in da.dims:
-        raise ValueError(f"La variable {var_name!r} no tiene dimensión 'time'.")
+        raise ValueError(f"Variable {var_name!r} does not have a 'time' dimension.")
 
     if start_time or end_time:
         da = da.sel(time=slice(start_time, end_time))
@@ -615,11 +615,11 @@ def create_radar_gif(
 
     times = da.time.values
     if len(times) == 0:
-        raise ValueError("No hay datos en el rango temporal seleccionado.")
+        raise ValueError("There are no data in the selected time range.")
 
-    print(f"Número de frames: {len(times)}")
-    print(f"Primer tiempo: {times[0]}")
-    print(f"Último tiempo: {times[-1]}")
+    print(f"Number of frames: {len(times)}")
+    print(f"First time: {times[0]}")
+    print(f"Last time: {times[-1]}")
 
     cmap, norm, bounds = get_radar_cmap()
     frames = []
@@ -665,13 +665,13 @@ def create_radar_gif(
         frames.append(image)
         plt.close(fig)
 
-    print("\nFrames generados.")
+    print("\nFrames generated.")
 
     output_gif = Path(output_gif)
     output_gif.parent.mkdir(parents=True, exist_ok=True)
     imageio.mimsave(output_gif, frames, fps=fps)
 
-    print(f"GIF guardado en: {output_gif}")
+    print(f"GIF saved to: {output_gif}")
 
 
 # =============================================================================
