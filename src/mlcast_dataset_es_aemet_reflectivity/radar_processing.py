@@ -23,9 +23,9 @@ DEFAULT_STANDARD_NAME: str | None = "equivalent_reflectivity_factor"
 
 def infer_radar_variable(ds: xr.Dataset) -> str:
     """
-    Detecta la variable principal radar:
-    - prioriza variables 3D con dimensión time
-    - ignora variables auxiliares como crs
+    Detect the main radar variable:
+    - prioritize 3D variables with a time dimension
+    - ignore auxiliary variables such as crs
     """
     ignored_vars = {"crs", "spatial_ref", "projection"}
 
@@ -42,7 +42,7 @@ def infer_radar_variable(ds: xr.Dataset) -> str:
     if not candidates:
         non_aux = [v for v in ds.data_vars if v.lower() not in ignored_vars]
         if not non_aux:
-            raise ValueError("El dataset no contiene variables de datos radar.")
+            raise ValueError("The dataset does not contain radar data variables.")
         return non_aux[-1]
 
     preferred_tokens = [
@@ -76,7 +76,7 @@ def infer_lat_lon_names(ds: xr.Dataset) -> tuple[str, str]:
             lon_name = name
 
     if lat_name is None or lon_name is None:
-        raise ValueError("No se han encontrado variables lat/lon en el dataset.")
+        raise ValueError("lat/lon variables were not found in the dataset.")
 
     return lat_name, lon_name
 
@@ -87,16 +87,16 @@ def _rename_spatial_dims(
     lon: xr.DataArray,
 ) -> tuple[xr.DataArray, xr.DataArray, xr.DataArray]:
     """
-    Fuerza nombres espaciales y/x en la variable principal.
-    Soporta lat/lon 1D o 2D.
+    Force y/x spatial dimension names in the main variable.
+    Supports 1D or 2D lat/lon.
     """
     dims = list(da.dims)
     if "time" not in dims:
-        raise ValueError(f"La variable radar no tiene dimensión time: {dims}")
+        raise ValueError(f"The radar variable does not have a time dimension: {dims}")
 
     spatial_dims = [d for d in dims if d != "time"]
     if len(spatial_dims) != 2:
-        raise ValueError(f"Se esperaban 2 dimensiones espaciales, no {len(spatial_dims)}: {dims}")
+        raise ValueError(f"Expected 2 spatial dimensions, not {len(spatial_dims)}: {dims}")
 
     rename_map = {}
     if spatial_dims[0] != "y":
@@ -113,7 +113,7 @@ def _rename_spatial_dims(
 
 def _lat_lon_to_2d(lat: xr.DataArray, lon: xr.DataArray) -> tuple[xr.DataArray, xr.DataArray]:
     """
-    Convierte lat/lon a 2D con dims (y, x).
+    Convert lat/lon to 2D with dims (y, x).
     """
     if lat.dims == ("y",) and lon.dims == ("x",):
         lon2d, lat2d = np.meshgrid(lon.values, lat.values)
@@ -132,7 +132,7 @@ def _lat_lon_to_2d(lat: xr.DataArray, lon: xr.DataArray) -> tuple[xr.DataArray, 
         return lat.transpose("y", "x"), lon.transpose("y", "x")
 
     raise ValueError(
-        f"Formato de lat/lon no soportado. lat.dims={lat.dims}, lon.dims={lon.dims}"
+        f"Unsupported lat/lon format. lat.dims={lat.dims}, lon.dims={lon.dims}"
     )
 
 
@@ -143,7 +143,7 @@ def standardize_radar_dataset(
     standard_name: str | None = DEFAULT_STANDARD_NAME,
 ) -> xr.Dataset:
     """
-    Estandariza un NetCDF radar a un Dataset con:
+    Standardize a radar NetCDF into a Dataset with:
       - <var_name>(time, y, x)
       - time
       - y, x
@@ -271,7 +271,7 @@ def assert_same_spatial_grid(
 ) -> None:
     datasets = list(datasets)
     if not datasets:
-        raise ValueError("No hay datasets para comparar.")
+        raise ValueError("There are no datasets to compare.")
 
     ref = datasets[0]
     ref_lat = ref["lat"].values
@@ -281,13 +281,13 @@ def assert_same_spatial_grid(
     for i, ds in enumerate(datasets[1:], start=1):
         if ds[var_name].shape[1:] != ref_shape:
             raise ValueError(
-                f"Shape espacial inconsistente en dataset {i}: "
+                f"Inconsistent spatial shape in dataset {i}: "
                 f"{ds[var_name].shape[1:]} != {ref_shape}"
             )
         if not np.allclose(ds["lat"].values, ref_lat, rtol=rtol, atol=atol, equal_nan=True):
-            raise ValueError(f"lat inconsistente en dataset {i}")
+            raise ValueError(f"Inconsistent lat in dataset {i}")
         if not np.allclose(ds["lon"].values, ref_lon, rtol=rtol, atol=atol, equal_nan=True):
-            raise ValueError(f"lon inconsistente en dataset {i}")
+            raise ValueError(f"Inconsistent lon in dataset {i}")
 
 
 def load_and_standardize_nc_files(
@@ -302,7 +302,7 @@ def load_and_standardize_nc_files(
     for fp in nc_files:
         fp = Path(fp)
         if verbose:
-            print(f"Leyendo: {fp}")
+            print(f"Reading: {fp}")
 
         ds = xr.open_dataset(fp, decode_times=True, mask_and_scale=False)
 
@@ -312,7 +312,7 @@ def load_and_standardize_nc_files(
                 inspect_raw_fn(ds, radar_var)
 
             if verbose:
-                print(f"Variable radar inferida: {radar_var}")
+                print(f"Inferred radar variable: {radar_var}")
 
             std = standardize_radar_dataset(
                 ds,
@@ -333,7 +333,7 @@ def concat_radar_datasets(
 ) -> xr.Dataset:
     datasets = list(datasets)
     if not datasets:
-        raise ValueError("No hay datasets para concatenar.")
+        raise ValueError("There are no datasets to concatenate.")
 
     assert_same_spatial_grid(datasets, var_name=var_name)
 
@@ -429,14 +429,14 @@ def _clean_variable_attrs_for_zarr(ds: xr.Dataset, var_name: str = DEFAULT_VAR_N
 
 def build_zarr_v3_compressors(compression_level: int = 5):
     """
-    Construye compresores para Zarr v3 compatibles con zarr 3.1.6.
+    Build Zarr v3 compressors compatible with zarr 3.1.6.
     """
     try:
         from zarr.codecs import ZstdCodec
     except Exception as e:
         raise RuntimeError(
-            "No se pudo importar zarr.codecs.ZstdCodec. "
-            "Revisa la instalación de zarr 3.x."
+            "Could not import zarr.codecs.ZstdCodec. "
+            "Check the zarr 3.x installation."
         ) from e
 
     return (ZstdCodec(level=compression_level),)
@@ -451,9 +451,9 @@ def _save_radar_dataset_to_zarr_v3_sharded(
     shard_time: int = 144,
 ) -> Path:
     """
-    Escribe manualmente un Zarr v3 con sharding.
-    - chunks = unidad lógica de lectura
-    - shards = unidad física de almacenamiento/escritura
+    Manually write a sharded Zarr v3 store.
+    - chunks = logical read unit
+    - shards = physical storage/write unit
     """
     zarr_path = Path(zarr_path)
     store = _open_local_store(zarr_path)
@@ -464,7 +464,7 @@ def _save_radar_dataset_to_zarr_v3_sharded(
     radar_shards = (shard_time, ds.sizes["y"], ds.sizes["x"])
 
     if shard_time < time_chunk:
-        raise ValueError("shard_time debe ser >= time_chunk")
+        raise ValueError("shard_time must be greater than or equal to time_chunk")
 
     root = zarr.group(store=store, overwrite=True, zarr_format=3)
     root.attrs.update(dict(ds.attrs))
@@ -555,10 +555,10 @@ def _save_radar_dataset_to_zarr_v3_sharded(
         t1 = min(t0 + shard_time, ntime)
         block = ds[var_name].isel(time=slice(t0, t1)).values.astype("float32")
         arr_radar[t0:t1, :, :] = block
-        print(f"Escrito bloque temporal {t0}:{t1}")
+        print(f"Written time block {t0}:{t1}")
 
     print(
-        f"Zarr guardado en: {zarr_path} "
+        f"Zarr saved to: {zarr_path} "
         f"(format=v3, sharding=True, chunks={radar_chunks}, shards={radar_shards})"
     )
     return zarr_path
@@ -585,7 +585,7 @@ def save_radar_dataset_to_zarr(
 
     if zarr_format == 3 and use_sharding:
         if shard_time is None:
-            raise ValueError("Debes indicar shard_time si use_sharding=True y zarr_format=3")
+            raise ValueError("You must provide shard_time if use_sharding=True and zarr_format=3")
 
         return _save_radar_dataset_to_zarr_v3_sharded(
             ds=ds,
@@ -643,10 +643,10 @@ def save_radar_dataset_to_zarr(
         )
 
     else:
-        raise ValueError("zarr_format debe ser 2 o 3")
+        raise ValueError("zarr_format must be 2 or 3")
 
     print(
-        f"Zarr guardado en: {zarr_path} "
+        f"Zarr saved to: {zarr_path} "
         f"(format=v{zarr_format}, sharding={use_sharding})"
     )
     return zarr_path
@@ -690,7 +690,7 @@ def build_radar_zarr_from_nc_files(
     )
 
     if inspect and inspect_state_fn is not None:
-        print(f"\nNúmero de datasets estandarizados: {len(standardized)}")
+        print(f"\nNumber of standardized datasets: {len(standardized)}")
         for i, ds in enumerate(standardized[:2]):
             inspect_state_fn(ds, label=f"standardized[{i}]", var_name=var_name, time_index=0)
 
@@ -699,7 +699,7 @@ def build_radar_zarr_from_nc_files(
     if inspect and inspect_state_fn is not None:
         inspect_state_fn(
             ds_all,
-            label="después de concat_radar_datasets",
+            label="after concat_radar_datasets",
             var_name=var_name,
             time_index=0,
         )
@@ -726,7 +726,7 @@ def build_radar_zarr_from_nc_files(
     if inspect and inspect_state_fn is not None:
         inspect_state_fn(
             ds_all,
-            label="después de prepare_radar_dataset_for_zarr",
+            label="after prepare_radar_dataset_for_zarr",
             var_name=var_name,
             time_index=0,
         )
@@ -750,7 +750,7 @@ def build_radar_zarr_from_nc_files(
 
         inspect_state_fn(
             zarr_path,
-            label="después de save_radar_dataset_to_zarr (reapertura decode_cf=False)",
+            label="after save_radar_dataset_to_zarr (reopen decode_cf=False)",
             var_name=var_name,
             time_index=0,
             decode_cf_for_zarr=False,
@@ -758,7 +758,7 @@ def build_radar_zarr_from_nc_files(
         )
         inspect_state_fn(
             zarr_path,
-            label="después de save_radar_dataset_to_zarr (reapertura decode_cf=True)",
+            label="after save_radar_dataset_to_zarr (reopen decode_cf=True)",
             var_name=var_name,
             time_index=0,
             decode_cf_for_zarr=True,

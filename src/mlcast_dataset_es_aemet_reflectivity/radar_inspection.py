@@ -21,54 +21,54 @@ def quick_validate_radar_zarr(
     var_name: str = DEFAULT_VAR_NAME,
     consolidated: bool | None = None,
 ) -> None:
-    print("\n--- VALIDACIÓN RÁPIDA ---")
+    print("\n--- QUICK VALIDATION ---")
     ds = open_radar_zarr(zarr_path, consolidated=consolidated)
 
     print(ds)
 
     if var_name not in ds:
-        raise ValueError(f"Falta variable '{var_name}'")
+        raise ValueError(f"Missing variable '{var_name}'")
 
     if ds[var_name].dims != ("time", "y", "x"):
-        raise ValueError(f"Dims incorrectas en {var_name}: {ds[var_name].dims}")
+        raise ValueError(f"Incorrect dims in {var_name}: {ds[var_name].dims}")
 
     if "lat" not in ds.coords or "lon" not in ds.coords:
-        raise ValueError("Faltan coords lat/lon")
+        raise ValueError("Missing lat/lon coordinates")
 
     if ds["lat"].dims != ("y", "x"):
-        raise ValueError(f"lat dims incorrectas: {ds['lat'].dims}")
+        raise ValueError(f"Incorrect lat dims: {ds['lat'].dims}")
     if ds["lon"].dims != ("y", "x"):
-        raise ValueError(f"lon dims incorrectas: {ds['lon'].dims}")
+        raise ValueError(f"Incorrect lon dims: {ds['lon'].dims}")
 
     if "spatial_ref" not in ds:
-        raise ValueError("Falta variable spatial_ref")
+        raise ValueError("Missing spatial_ref variable")
 
     wkt = ds["spatial_ref"].attrs.get("crs_wkt") or ds["spatial_ref"].attrs.get("spatial_ref")
     if wkt is None:
-        raise ValueError("Falta crs_wkt/spatial_ref en spatial_ref")
+        raise ValueError("Missing crs_wkt/spatial_ref in spatial_ref")
 
     from pyproj import CRS
     import cartopy.crs as ccrs
 
     crs = CRS.from_wkt(wkt)
-    print("CRS leído desde WKT:", crs)
+    print("CRS read from WKT:", crs)
 
     cartopy_crs = ccrs.PlateCarree()
-    print("CRS cartopy usado para visualización:", cartopy_crs)
+    print("Cartopy CRS used for visualization:", cartopy_crs)
 
     chunks = ds[var_name].encoding.get("chunks")
-    print(f"Chunks {var_name}:", chunks)
+    print(f"{var_name} chunks:", chunks)
 
     nan_count = int(np.isnan(ds[var_name].values).sum())
-    print("Número de NaNs:", nan_count)
+    print("Number of NaNs:", nan_count)
 
-    print("Validación rápida OK")
+    print("Quick validation OK")
 
 
 def inspect_raw_radar_dataset(ds: xr.Dataset, radar_var: str) -> None:
     da = ds[radar_var]
 
-    print("\n--- INSPECCIÓN RAW NETCDF ---")
+    print("\n--- RAW NETCDF INSPECTION ---")
     print("variable:", radar_var)
     print("dims:", da.dims)
     print("shape:", da.shape)
@@ -83,7 +83,7 @@ def inspect_raw_radar_dataset(ds: xr.Dataset, radar_var: str) -> None:
     print("raw unique sample:", np.unique(vals)[:20])
 
     finite = np.isfinite(vals)
-    print("raw finite:", int(finite.sum()), "de", vals.size)
+    print("raw finite:", int(finite.sum()), "out of", vals.size)
 
 
 def inspect_radar_dataset_in_memory(
@@ -94,7 +94,7 @@ def inspect_radar_dataset_in_memory(
     field = ds[var_name].isel(time=time_index).compute().values
     finite = np.isfinite(field)
 
-    print("\n--- INSPECCIÓN EN MEMORIA ---")
+    print("\n--- IN-MEMORY INSPECTION ---")
     print("shape:", field.shape)
     print("dtype:", field.dtype)
     print("n_total:", field.size)
@@ -119,44 +119,44 @@ def inspect_radar_state(
     consolidated: bool | None = None,
 ) -> None:
     print(f"\n{'=' * 80}")
-    print(f"INSPECCIÓN: {label}")
+    print(f"INSPECTION: {label}")
     print(f"{'=' * 80}")
 
     if isinstance(obj, xr.Dataset):
         ds = obj
-        source = "dataset en memoria"
+        source = "in-memory dataset"
     else:
         ds = xr.open_zarr(obj, consolidated=consolidated, decode_cf=decode_cf_for_zarr)
         source = (
             f"zarr (decode_cf={decode_cf_for_zarr}, consolidated={consolidated})"
         )
 
-    print("Fuente:", source)
+    print("Source:", source)
     print(ds)
 
     if var_name not in ds:
-        print(f"No existe variable '{var_name}'")
+        print(f"Variable '{var_name}' does not exist")
         return
 
     field = ds[var_name].isel(time=time_index).load().values
     finite = np.isfinite(field)
 
-    print("\n--- ESTADÍSTICAS DEL CAMPO ---")
+    print("\n--- FIELD STATISTICS ---")
     print("shape:", field.shape)
     print("dtype:", field.dtype)
     print("n_total:", field.size)
     print("n_finite:", int(finite.sum()))
     print("n_nan:", int(np.isnan(field).sum()))
 
-    print("\n--- ATTRS VARIABLE ---")
+    print("\n--- VARIABLE ATTRS ---")
     print(ds[var_name].attrs)
 
-    print("\n--- ENCODING VARIABLE ---")
+    print("\n--- VARIABLE ENCODING ---")
     print(ds[var_name].encoding)
 
     if finite.any():
         vals = field[finite]
-        print("\n--- RANGO DE VALORES FINITOS ---")
+        print("\n--- FINITE VALUE RANGE ---")
         print("min:", float(vals.min()))
         print("max:", float(vals.max()))
         print("mean:", float(vals.mean()))
@@ -165,9 +165,9 @@ def inspect_radar_state(
         print("p50:", float(np.percentile(vals, 50)))
         print("p95:", float(np.percentile(vals, 95)))
         print("p99:", float(np.percentile(vals, 99)))
-        print("sample únicos:", np.unique(vals)[:20])
+        print("unique sample:", np.unique(vals)[:20])
     else:
-        print("\nNo hay valores finitos en este estado.")
+        print("\nThere are no finite values in this state.")
 
 
 def inspect_radar_zarr_raw(
@@ -180,7 +180,7 @@ def inspect_radar_zarr_raw(
     field = ds[var_name].isel(time=time_index).load().values
     finite = np.isfinite(field)
 
-    print("\n--- INSPECCIÓN ZARR RAW (decode_cf=False) ---")
+    print("\n--- RAW ZARR INSPECTION (decode_cf=False) ---")
     print("shape:", field.shape)
     print("dtype:", field.dtype)
     print("n_total:", field.size)
@@ -210,7 +210,7 @@ def inspect_radar_zarr(
     n_finite = int(finite.sum())
     n_nan = int(np.isnan(field).sum())
 
-    print("\n--- INSPECCIÓN CAMPO ---")
+    print("\n--- FIELD INSPECTION ---")
     print("shape:", field.shape)
     print("dtype:", field.dtype)
     print("n_total:", n_total)
@@ -228,7 +228,7 @@ def inspect_radar_zarr(
         print("p95:", float(np.percentile(vals, 95)))
         print("p99:", float(np.percentile(vals, 99)))
     else:
-        print("No hay valores finitos en el campo.")
+        print("There are no finite values in the field.")
 
 
 def plot_radar_from_zarr(
@@ -271,7 +271,7 @@ def plot_radar_from_zarr(
     if output_png is not None:
         output_png = Path(output_png)
         fig.savefig(output_png, dpi=150, bbox_inches="tight")
-        print(f"Figura guardada en: {output_png}")
+        print(f"Figure saved to: {output_png}")
 
     plt.show()
 
@@ -321,6 +321,6 @@ def plot_radar_from_zarr_cartopy(
     if output_png is not None:
         output_png = Path(output_png)
         fig.savefig(output_png, dpi=150, bbox_inches="tight")
-        print(f"Figura guardada en: {output_png}")
+        print(f"Figure saved to: {output_png}")
 
     plt.show()

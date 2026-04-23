@@ -29,7 +29,7 @@ def find_nc_files(path: str | Path) -> list[Path]:
 
 def _rename_only_existing_dims(da, rename_map: dict[str, str]):
     """
-    Renombra solo las dimensiones que realmente existen en la DataArray.
+    Rename only the dimensions that actually exist in the DataArray.
     """
     local_map = {d: rename_map[d] for d in da.dims if d in rename_map}
     if local_map:
@@ -48,7 +48,7 @@ def build_compressor(
     blosc_shuffle: str = "bitshuffle",
 ):
     """
-    Construye un compresor numcodecs configurable para Zarr v2.
+    Build a configurable numcodecs compressor for Zarr v2.
     """
     compressor_name = compressor_name.lower().strip()
 
@@ -65,8 +65,8 @@ def build_compressor(
         shuffle_value = shuffle_map.get(blosc_shuffle.lower())
         if shuffle_value is None:
             raise ValueError(
-                f"blosc_shuffle no válido: {blosc_shuffle}. "
-                "Usa 'bitshuffle', 'shuffle' o 'noshuffle'."
+                f"Invalid blosc_shuffle: {blosc_shuffle}. "
+                "Use 'bitshuffle', 'shuffle' or 'noshuffle'."
             )
 
         return Blosc(
@@ -76,14 +76,14 @@ def build_compressor(
         )
 
     raise ValueError(
-        f"compressor_name no válido: {compressor_name}. "
-        "Usa 'zstd' o 'blosc'."
+        f"Invalid compressor_name: {compressor_name}. "
+        "Use 'zstd' or 'blosc'."
     )
 
 
 def add_crs_metadata(ds, epsg: str = "EPSG:4326"):
     """
-    Añade variable spatial_ref con WKT para compatibilidad.
+    Add a spatial_ref variable with WKT for compatibility.
     """
     crs = CRS.from_user_input(epsg)
 
@@ -103,7 +103,7 @@ def add_crs_metadata(ds, epsg: str = "EPSG:4326"):
 
 def _open_local_store(path: str | Path):
     """
-    Intenta abrir un store local válido para zarr-python 3.x.
+    Try to open a valid local store for zarr-python 3.x.
     """
     path = str(path)
 
@@ -116,6 +116,6 @@ def _open_local_store(path: str | Path):
         return zarr.storage.DirectoryStore(path)
     except Exception as e:
         raise RuntimeError(
-            "No se pudo crear un store local para Zarr. "
-            "Revisa la versión de zarr-python instalada."
+            "Could not create a local store for Zarr. "
+            "Check the installed zarr-python version."
         ) from e

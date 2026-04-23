@@ -39,7 +39,7 @@ DEFAULTS: dict[str, Any] = {
     "png_out_cartopy": "./radar_quicklook_cartopy.png",
 
     # -------------------------------------------------------------------------
-    # Temporal range
+    # Time range
     # -------------------------------------------------------------------------
     "fechaini": "20241001T000000",
     "fechafin": "20241002T000000",
@@ -112,7 +112,7 @@ def str2bool(value: str | bool) -> bool:
     if value in {"false", "0", "no", "n"}:
         return False
 
-    raise argparse.ArgumentTypeError(f"Booleano no válido: {value}")
+    raise argparse.ArgumentTypeError(f"Invalid boolean value: {value}")
 
 
 def load_yaml_config(path: str | Path | None) -> dict[str, Any]:
@@ -121,21 +121,22 @@ def load_yaml_config(path: str | Path | None) -> dict[str, Any]:
 
     path = Path(path)
     if not path.exists():
-        raise FileNotFoundError(f"No existe el fichero de configuración: {path}")
+        raise FileNotFoundError(f"Configuration file does not exist: {path}")
 
     with path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
 
     if not isinstance(data, dict):
-        raise ValueError("El config.yaml debe contener un diccionario clave: valor")
+        raise ValueError("config.yaml must contain a key-value dictionary")
 
     return data
 
 
 def cli_overrides_to_dict(args: argparse.Namespace) -> dict[str, Any]:
     """
-    Devuelve solo los argumentos CLI pasados explícitamente.
-    Precedencia final: CLI > YAML > DEFAULTS
+    Return only CLI arguments that were explicitly provided.
+
+    Final precedence: CLI > YAML > DEFAULTS
     """
     result: dict[str, Any] = {}
 
@@ -163,7 +164,7 @@ def validate_config(cfg: dict[str, Any]) -> None:
     zarr_version = int(cfg["zarr_version"])
     if zarr_version not in {2, 3}:
         raise ValueError(
-            f"zarr_version debe ser 2 o 3, recibido: {zarr_version}"
+            f"zarr_version must be 2 or 3, got: {zarr_version}"
         )
 
 
@@ -242,7 +243,7 @@ def run_from_config(cfg: dict[str, Any]) -> None:
         config = build_config_v3(cfg)
         run_pipeline_v3(config)
     else:
-        raise ValueError(f"Versión de Zarr no soportada: {zarr_version}")
+        raise ValueError(f"Unsupported Zarr version: {zarr_version}")
 
 
 # =============================================================================
@@ -252,8 +253,8 @@ def run_from_config(cfg: dict[str, Any]) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Entry point único para construir datasets radar en Zarr v2 o v3 "
-            "usando defaults, YAML y overrides por CLI."
+            "Single entry point to build radar datasets in Zarr v2 or v3 "
+            "using defaults, YAML, and CLI overrides."
         )
     )
 
@@ -261,7 +262,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         type=str,
         default=None,
-        help="Ruta al fichero YAML de configuración.",
+        help="Path to the YAML configuration file.",
     )
 
     parser.add_argument("--zarr_version", type=int, default=None)
@@ -302,7 +303,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--zarr_format", type=int, default=None)
     parser.add_argument("--use_sharding", type=str2bool, default=None)
 
-    # común / opcional según versión
+    # Common / optional depending on version
     parser.add_argument("--shard_time", type=int, default=None)
 
     # v3

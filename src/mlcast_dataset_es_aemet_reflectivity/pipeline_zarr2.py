@@ -124,11 +124,11 @@ def append_chunk_zarr_to_final(
     try:
         if first_chunk:
             write_ds_to_zarr_v2(ds_chunk, final_zarr_path, mode="w")
-            print(f"[OK] Creado Zarr final con el primer chunk: {final_zarr_path}")
+            print(f"[OK] Final Zarr store created from the first chunk: {final_zarr_path}")
             return False
 
         write_ds_to_zarr_v2(ds_chunk, final_zarr_path, mode="a", append_dim="time")
-        print(f"[OK] Chunk añadido al Zarr final: {final_zarr_path}")
+        print(f"[OK] Chunk appended to the final Zarr store: {final_zarr_path}")
         return False
     finally:
         ds_chunk.close()
@@ -147,7 +147,7 @@ def is_http_429_error(exc: Exception) -> bool:
 def download_chunk_with_retries(*, config: RadarBuildConfig, fechaini_chunk: str, fechafin_chunk: str, chunk_dir: Path) -> None:
     api_key = os.environ.get("AEMET_API_KEY")
     if not api_key:
-        raise ValueError("Define la variable de entorno AEMET_API_KEY antes de ejecutar el pipeline.")
+        raise ValueError("Define the AEMET_API_KEY environment variable before running the pipeline.")
 
     attempt = 0
     wait_seconds = config.initial_wait_429
@@ -172,11 +172,11 @@ def download_chunk_with_retries(*, config: RadarBuildConfig, fechaini_chunk: str
             attempt += 1
             if attempt > config.max_retries_429:
                 raise RuntimeError(
-                    f"Se superó el número máximo de reintentos por error 429 para el chunk {fechaini_chunk} -> {fechafin_chunk}"
+                    f"Maximum number of retries exceeded due to HTTP 429 for chunk {fechaini_chunk} -> {fechafin_chunk}"
                 ) from exc
             print(
-                f"[WARNING] HTTP 429 en chunk {fechaini_chunk} -> {fechafin_chunk}. "
-                f"Reintento {attempt}/{config.max_retries_429} tras esperar {wait_seconds} s..."
+                f"[WARNING] HTTP 429 on chunk {fechaini_chunk} -> {fechafin_chunk}. "
+                f"Retry {attempt}/{config.max_retries_429} after waiting {wait_seconds} s..."
             )
             time.sleep(wait_seconds)
             wait_seconds = min(int(wait_seconds * config.backoff_factor_429), config.max_wait_429)
@@ -196,12 +196,12 @@ def run_pipeline(config: RadarBuildConfig) -> None:
     dt_ini = parse_aemet_datetime(config.fechaini)
     dt_fin = parse_aemet_datetime(config.fechafin)
     if dt_fin <= dt_ini:
-        raise ValueError("fechafin debe ser posterior a fechaini.")
+        raise ValueError("fechafin must be later than fechaini.")
 
     if config.zarr_format != 2:
         raise NotImplementedError(
-            "Este pipeline incremental por append está preparado para Zarr v2. "
-            "Para v3 con sharding conviene escribir el store final directamente."
+            "This incremental append-based pipeline is designed for Zarr v2. "
+            "For v3 with sharding, it is better to write the final store directly."
         )
 
     first_chunk = True
@@ -219,9 +219,9 @@ def run_pipeline(config: RadarBuildConfig) -> None:
 
         print("\n" + "=" * 100)
         print(f"CHUNK {i}")
-        print(f"Ventana: {w_ini_str} -> {w_fin_str}")
-        print(f"Directorio temporal: {chunk_dir}")
-        print(f"Zarr temporal: {chunk_zarr}")
+        print(f"Window: {w_ini_str} -> {w_fin_str}")
+        print(f"Temporary directory: {chunk_dir}")
+        print(f"Temporary Zarr: {chunk_zarr}")
         print("=" * 100)
 
         try:
@@ -232,10 +232,10 @@ def run_pipeline(config: RadarBuildConfig) -> None:
                 chunk_dir=chunk_dir,
             )
             nc_files_chunk = sorted(find_nc_files(chunk_dir))
-            print(f"Se han encontrado {len(nc_files_chunk)} archivos .nc en este chunk")
+            print(f"{len(nc_files_chunk)} .nc files were found in this chunk")
 
             if not nc_files_chunk:
-                print(f"[WARNING] Chunk vacío: {w_ini_str} -> {w_fin_str}")
+                print(f"[WARNING] Empty chunk: {w_ini_str} -> {w_fin_str}")
                 n_chunks_empty += 1
                 continue
 
@@ -271,23 +271,23 @@ def run_pipeline(config: RadarBuildConfig) -> None:
             n_chunks_ok += 1
         except Exception as exc:
             n_chunks_failed += 1
-            print(f"[ERROR] Falló el chunk {i} ({w_ini_str} -> {w_fin_str}): {exc}")
+            print(f"[ERROR] Chunk {i} failed ({w_ini_str} -> {w_fin_str}): {exc}")
         finally:
             safe_remove_path(chunk_dir)
             safe_remove_path(chunk_zarr)
 
     print("\n" + "#" * 100)
-    print("RESUMEN")
+    print("SUMMARY")
     print("#" * 100)
-    print(f"Chunks correctos: {n_chunks_ok}")
-    print(f"Chunks vacíos:    {n_chunks_empty}")
-    print(f"Chunks fallidos:  {n_chunks_failed}")
+    print(f"Successful chunks: {n_chunks_ok}")
+    print(f"Empty chunks:      {n_chunks_empty}")
+    print(f"Failed chunks:     {n_chunks_failed}")
 
     if first_chunk:
-        raise RuntimeError("No se ha podido construir el Zarr final: no hubo ningún chunk válido con datos.")
+        raise RuntimeError("Could not build the final Zarr store: there was no valid chunk with data.")
 
     ds = xr.open_zarr(config.zarr_out, consolidated=False)
-    print("\nDataset final:")
+    print("\nFinal dataset:")
     print(ds)
     if ds.sizes.get("time", 0) > 0:
         inspect_radar_dataset_in_memory(ds, var_name=config.var_name, time_index=0)

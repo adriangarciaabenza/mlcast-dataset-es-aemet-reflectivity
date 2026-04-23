@@ -111,7 +111,7 @@ def download_chunk_with_retries(
 ) -> None:
     api_key = os.environ.get("AEMET_API_KEY")
     if not api_key:
-        raise ValueError("Define la variable de entorno AEMET_API_KEY antes de ejecutar el pipeline.")
+        raise ValueError("Define the AEMET_API_KEY environment variable before running the pipeline.")
 
     attempt = 0
     wait_seconds = config.initial_wait_429
@@ -136,11 +136,11 @@ def download_chunk_with_retries(
             attempt += 1
             if attempt > config.max_retries_429:
                 raise RuntimeError(
-                    f"Se superó el número máximo de reintentos por error 429 para el chunk {fechaini_chunk} -> {fechafin_chunk}"
+                    f"Maximum number of retries exceeded due to HTTP 429 for chunk {fechaini_chunk} -> {fechafin_chunk}"
                 ) from exc
             print(
-                f"[WARNING] HTTP 429 en chunk {fechaini_chunk} -> {fechafin_chunk}. "
-                f"Reintento {attempt}/{config.max_retries_429} tras esperar {wait_seconds} s..."
+                f"[WARNING] HTTP 429 on chunk {fechaini_chunk} -> {fechafin_chunk}. "
+                f"Retry {attempt}/{config.max_retries_429} after waiting {wait_seconds} s..."
             )
             time.sleep(wait_seconds)
             wait_seconds = min(int(wait_seconds * config.backoff_factor_429), config.max_wait_429)
@@ -148,14 +148,14 @@ def download_chunk_with_retries(
 
 def build_zarr_v3_compressors(compression_level: int = 5):
     """
-    Compresores compatibles con zarr 3.1.6.
+    Compressors compatible with zarr 3.1.6.
     """
     try:
         from zarr.codecs import ZstdCodec
     except Exception as e:
         raise RuntimeError(
-            "No se pudo importar zarr.codecs.ZstdCodec. "
-            "Revisa la instalación de zarr 3.x."
+            "Could not import zarr.codecs.ZstdCodec. "
+            "Check the zarr 3.x installation."
         ) from e
 
     return (ZstdCodec(level=compression_level),)
@@ -201,7 +201,7 @@ def _initialize_v3_store_from_template(
     
     root.attrs.update(dict(ds_template.attrs))
     
-    # license metadata
+    # License metadata
     root.attrs.update({
         "license": license_name,
         "institution": institution,
@@ -319,9 +319,9 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
     config.zarr_out = Path(config.zarr_out)
 
     if config.time_chunk != 1:
-        print("[WARNING] time_chunk != 1. Eso ya no cumple '1 chunk per timestep'.")
+        print("[WARNING] time_chunk != 1. This no longer satisfies '1 chunk per timestep'.")
     if config.shard_time < config.time_chunk:
-        raise ValueError("shard_time debe ser >= time_chunk")
+        raise ValueError("shard_time must be greater than or equal to time_chunk")
 
     clean_dir(config.workdir)
     safe_remove_path(config.zarr_out)
@@ -329,7 +329,7 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
     dt_ini = parse_aemet_datetime(config.fechaini)
     dt_fin = parse_aemet_datetime(config.fechafin)
     if dt_fin <= dt_ini:
-        raise ValueError("fechafin debe ser posterior a fechaini.")
+        raise ValueError("fechafin must be later than fechaini.")
 
     root = None
     arr_time = None
@@ -350,8 +350,8 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
 
         print("\n" + "=" * 100)
         print(f"CHUNK {i}")
-        print(f"Ventana: {w_ini_str} -> {w_fin_str}")
-        print(f"Directorio temporal: {chunk_dir}")
+        print(f"Window: {w_ini_str} -> {w_fin_str}")
+        print(f"Temporary directory: {chunk_dir}")
         print("=" * 100)
 
         try:
@@ -362,10 +362,10 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
                 chunk_dir=chunk_dir,
             )
             nc_files_chunk = sorted(find_nc_files(chunk_dir))
-            print(f"Se han encontrado {len(nc_files_chunk)} archivos .nc en este chunk")
+            print(f"{len(nc_files_chunk)} .nc files were found in this chunk")
 
             if not nc_files_chunk:
-                print(f"[WARNING] Chunk vacío: {w_ini_str} -> {w_fin_str}")
+                print(f"[WARNING] Empty chunk: {w_ini_str} -> {w_fin_str}")
                 n_chunks_empty += 1
                 continue
 
@@ -377,7 +377,7 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
                 inspect_raw_fn=inspect_raw_radar_dataset if config.inspect else None,
             )
             if not standardized:
-                print(f"[WARNING] Chunk sin datasets estandarizados: {w_ini_str} -> {w_fin_str}")
+                print(f"[WARNING] Chunk without standardized datasets: {w_ini_str} -> {w_fin_str}")
                 n_chunks_empty += 1
                 continue
 
@@ -402,14 +402,14 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
             ds_chunk = _filter_unseen_times(ds_chunk, seen_times)
 
             if ds_chunk.sizes.get("time", 0) == 0:
-                print(f"[WARNING] Chunk sin tiempos nuevos tras deduplicación: {w_ini_str} -> {w_fin_str}")
+                print(f"[WARNING] Chunk without new times after deduplication: {w_ini_str} -> {w_fin_str}")
                 n_chunks_empty += 1
                 continue
 
             if config.inspect:
                 inspect_radar_state(
                     ds_chunk,
-                    label=f"chunk preparado [{w_ini_str} -> {w_fin_str}]",
+                    label=f"prepared chunk [{w_ini_str} -> {w_fin_str}]",
                     var_name=config.var_name,
                     time_index=0,
                 )
@@ -427,7 +427,7 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
                     source=config.source,
                     attribution=config.attribution,
                 )
-                print(f"[OK] Inicializado store Zarr v3 sharded: {config.zarr_out}")
+                print(f"[OK] Initialized sharded Zarr v3 store: {config.zarr_out}")
 
             n_written_chunk = _append_ds_to_v3_store(
                 ds_chunk,
@@ -438,27 +438,27 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
             seen_times.update(_datetime64_to_int64(ds_chunk["time"].values).tolist())
             n_steps_written += n_written_chunk
             n_chunks_ok += 1
-            print(f"[OK] Añadidos {n_written_chunk} timesteps al store final")
+            print(f"[OK] Added {n_written_chunk} timesteps to the final store")
 
         except Exception as exc:
             n_chunks_failed += 1
-            print(f"[ERROR] Falló el chunk {i} ({w_ini_str} -> {w_fin_str}): {exc}")
+            print(f"[ERROR] Chunk {i} failed ({w_ini_str} -> {w_fin_str}): {exc}")
         finally:
             safe_remove_path(chunk_dir)
 
     print("\n" + "#" * 100)
-    print("RESUMEN")
+    print("SUMMARY")
     print("#" * 100)
-    print(f"Chunks correctos: {n_chunks_ok}")
-    print(f"Chunks vacíos:    {n_chunks_empty}")
-    print(f"Chunks fallidos:  {n_chunks_failed}")
-    print(f"Timesteps escritos: {n_steps_written}")
+    print(f"Successful chunks: {n_chunks_ok}")
+    print(f"Empty chunks:      {n_chunks_empty}")
+    print(f"Failed chunks:     {n_chunks_failed}")
+    print(f"Written timesteps: {n_steps_written}")
 
     if arr_time is None or arr_radar is None:
-        raise RuntimeError("No se ha podido construir el Zarr final: no hubo ningún chunk válido con datos.")
+        raise RuntimeError("Could not build the final Zarr store: there was no valid chunk with data.")
 
     ds = xr.open_zarr(config.zarr_out, consolidated=False)
-    print("\nDataset final:")
+    print("\nFinal dataset:")
     print(ds)
     if ds.sizes.get("time", 0) > 0:
         inspect_radar_dataset_in_memory(ds, var_name=config.var_name, time_index=0)

@@ -11,8 +11,8 @@ def _get_api_key(api_key: Optional[str] = None) -> str:
     key = api_key or os.environ.get("AEMET_API_KEY")
     if not key:
         raise ValueError(
-            "No se encontró API key. "
-            "Pásala como argumento api_key o define la variable de entorno AEMET_API_KEY."
+            "API key not found. "
+            "Pass it as the api_key argument or define the AEMET_API_KEY environment variable."
         )
     return key
 
@@ -52,17 +52,17 @@ def download_gauge_data(
     estado = data["estado"]
 
     if estado == 200:
-        print("Éxito")
+        print("Success")
         url_datos = data["datos"]
         datos = requests.get(url_datos, headers=headers, params=querystring, verify=False, timeout=300)
         datos.raise_for_status()
 
         output_file = out_dir / "datos.csv"
         output_file.write_bytes(datos.content)
-        print(f"Guardado en: {output_file}")
+        print(f"Saved to: {output_file}")
         return output_file
     else:
-        raise RuntimeError(f"No se han podido obtener los datos. Código de estado: {estado}")
+        raise RuntimeError(f"Could not retrieve the data. Status code: {estado}")
 
 
 def download_radar_data(
@@ -78,7 +78,8 @@ def download_radar_data(
     api_key: Optional[str] = None,
 ) -> List[Path]:
     """
-    Descarga radar desde BigData AEMET, extrae el tar y devuelve la lista de ficheros extraídos.
+    Download radar data from AEMET BigData, extract the tar file, and return the
+    list of extracted files.
     """
     api_key = _get_api_key(api_key)
     out_dir = _ensure_dir(out_dir)
@@ -101,9 +102,9 @@ def download_radar_data(
     estado = data["estado"]
 
     if estado != 200:
-        raise RuntimeError(f"No se han podido obtener los datos. Código de estado: {estado}")
+        raise RuntimeError(f"Could not retrieve the data. Status code: {estado}")
 
-    print("Éxito")
+    print("Success")
     url_datos = data["datos"]
     datos = requests.get(url_datos, headers=headers, params=querystring, verify=False, timeout=600)
     datos.raise_for_status()
@@ -127,10 +128,10 @@ def download_radar_data(
             content = extracted.read()
             member_path.write_bytes(content)
             extracted_files.append(member_path)
-            print(f"Extraído: {member_path}")
+            print(f"Extracted: {member_path}")
 
     tar_path.unlink(missing_ok=True)
-    print(f"Tar extraído en {out_dir}")
+    print(f"Tar file extracted into {out_dir}")
 
     return extracted_files
 
@@ -163,9 +164,9 @@ def download_sat_images(
     estado = data["estado"]
 
     if estado != 200:
-        raise RuntimeError(f"No se han podido obtener los datos. Código de estado: {estado}")
+        raise RuntimeError(f"Could not retrieve the data. Status code: {estado}")
 
-    print("Éxito")
+    print("Success")
     url_datos = data["datos"]
     datos = requests.get(url_datos, headers=headers, params=querystring, verify=False, timeout=600)
     datos.raise_for_status()
@@ -189,10 +190,10 @@ def download_sat_images(
             content = extracted.read()
             member_path.write_bytes(content)
             extracted_files.append(member_path)
-            print(f"Extraído: {member_path}")
+            print(f"Extracted: {member_path}")
 
     tar_path.unlink(missing_ok=True)
-    print(f"Tar extraído en {out_dir}")
+    print(f"Tar file extracted into {out_dir}")
 
     return extracted_files
 

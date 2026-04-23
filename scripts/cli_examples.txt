@@ -1,3 +1,16 @@
+python generate_monthly_configs.py --start_year 2024 --end_year 2024 \
+    --project_dir /perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity \
+    --config_dir /perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity/configs/monthly_v3 \
+    --output_dir /lustre/utmp/std/MLCAST_radar_data/outputs/monthly_v3 \
+    --create_zip false
+
+python merge_monthly_zarrs.py \
+    --input_dir /lustre/utmp/std/MLCAST_radar_data/outputs/monthly_v3 \
+    --output_zarr /path/to/final_merged.zarr
+
+python scripts/explore_zarr.py \
+    --zarr_path ./ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr
+
 python scripts/plot_zarr_gif.py \
   --zarr-path ./ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr \
   --var-name equivalent_reflectivity_factor \
@@ -7,7 +20,7 @@ python scripts/plot_zarr_gif.py \
   --fps 4 \
   --use-latlon
 
-python scripts/plot_zarr_gif_2.py \
+python scripts/plot_zarr_gif.py \
   --zarr-path ./ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr \
   --var-name equivalent_reflectivity_factor \
   --output-gif ./outputs/radar_ZAR_20240630_with_provinces.gif \

@@ -33,7 +33,7 @@ PROJECT_DIR=/perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity
 CONFIG=${PROJECT_DIR}/configs/AEMET-PPI_v3.yaml
 
 # API KEY AEMET
-export AEMET_API_KEY="Need the API KEY for Aemet bigda
+export AEMET_API_KEY="Need to obtain API KEY from http://bigdata.aemet.es/bigdata/altaUsuario?"
 
 # Para logs en tiempo real
 export PYTHONUNBUFFERED=1
