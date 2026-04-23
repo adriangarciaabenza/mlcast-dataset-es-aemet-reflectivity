@@ -21,8 +21,7 @@ CONFIG_LIST=${PROJECT_DIR}/configs/monthly_v3/config_list.txt
 source /perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity/.venv/bin/activate
 
 export PYTHONUNBUFFERED=1
-export AEMET_API_KEY="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZ2FyY2lhYUBhZW1ldC5lcyIsImp0aSI6ImM4NjRmMzc1LWY4OTgtNDlkNy1hZDFmLWQ3YTcwNDQ2ODRhYSIsImlzcyI6IkFFTUVUIiwiaWF0IjoxNjc4MjY4NzcwLCJ1c2VySWQiOiJjODY0ZjM3NS1mODk4LTQ5ZDctYWQxZi1kN2E3MDQ0Njg0YWEiLCJyb2xlIjoiIn0._f4rSIByCWg1CsxfdZFnxiextF6xYKTBMp9l5TjHqp4"
-
+export AEMET_API_KEY="Need to obtain API KEY from http://bigdata.aemet.es/bigdata/altaUsuario?"
 CONFIG=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "${CONFIG_LIST}")
 
 echo "=== JOB START ==="

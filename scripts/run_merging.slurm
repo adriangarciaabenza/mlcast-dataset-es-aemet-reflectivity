@@ -50,7 +50,7 @@ echo "PWD: $(pwd)"
 # RUN MERGE
 # =========================================================
 
-python scripts/merge_monthly_zarrs_2.py
+python scripts/merge_monthly_zarrs.py
 
 # =========================================================
 # END
