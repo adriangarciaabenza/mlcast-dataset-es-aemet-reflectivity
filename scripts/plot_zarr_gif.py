@@ -1,30 +1,116 @@
 from __future__ import annotations
 
+import argparse
 import shutil
 from pathlib import Path
 
 import imageio.v2 as imageio
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import xarray as xr
 from matplotlib.colors import BoundaryNorm, ListedColormap
 
 
 # =============================================================================
-# CONFIG
+# DEFAULT CONFIG
 # =============================================================================
 
-ZARR_PATH = Path("./ES-AEMET-radar_reflectivity-ppi_ZAR.zarr")
-VAR_NAME = "equivalent_reflectivity_factor"
+DEFAULT_ZARR_PATH = Path("./ES-AEMET-radar_reflectivity-ppi_ZAR.zarr")
+DEFAULT_VAR_NAME = "equivalent_reflectivity_factor"
+DEFAULT_OUTPUT_DIR = Path("./outputs")
+DEFAULT_OUTPUT_GIF = DEFAULT_OUTPUT_DIR / "radar.gif"
+DEFAULT_FPS = 4
+DEFAULT_USE_LATLON = True
 
-OUTPUT_DIR = Path("./outputs")
-OUTPUT_GIF = OUTPUT_DIR / "radar.gif"
 
-START_TIME = None
-END_TIME = None
+# =============================================================================
+# ARGPARSE
+# =============================================================================
 
-FPS = 4
-USE_LATLON = True
+def parse_time_or_none(value: str | None) -> str | None:
+    """
+    Valida que el string temporal tenga un formato interpretable por pandas/xarray.
+    Devuelve el string original para que luego xarray lo use directamente en .sel().
+    """
+    if value is None:
+        return None
+
+    try:
+        pd.to_datetime(value)
+    except Exception as e:
+        raise argparse.ArgumentTypeError(
+            f"Valor temporal no válido: {value!r}. "
+            f"Usa formatos como '2020-01-01' o '2020-01-01T12:00:00'."
+        ) from e
+
+    return value
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Genera un GIF animado a partir de un Zarr de radar."
+    )
+
+    parser.add_argument(
+        "--zarr-path",
+        type=Path,
+        default=DEFAULT_ZARR_PATH,
+        help="Ruta al dataset Zarr.",
+    )
+    parser.add_argument(
+        "--var-name",
+        type=str,
+        default=DEFAULT_VAR_NAME,
+        help="Nombre de la variable a representar.",
+    )
+    parser.add_argument(
+        "--output-gif",
+        type=Path,
+        default=DEFAULT_OUTPUT_GIF,
+        help="Ruta del GIF de salida.",
+    )
+    parser.add_argument(
+        "--start-time",
+        type=parse_time_or_none,
+        default=None,
+        help="Tiempo inicial. Ejemplos: '2020-01-01' o '2020-01-01T12:00:00'.",
+    )
+    parser.add_argument(
+        "--end-time",
+        type=parse_time_or_none,
+        default=None,
+        help="Tiempo final. Ejemplos: '2020-01-01' o '2020-01-01T18:00:00'.",
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=DEFAULT_FPS,
+        help="Frames por segundo del GIF.",
+    )
+
+    parser.add_argument(
+        "--clean-output",
+        action="store_true",
+        help="Borra el directorio de salida antes de generar el GIF.",
+    )
+
+    latlon_group = parser.add_mutually_exclusive_group()
+    latlon_group.add_argument(
+        "--use-latlon",
+        dest="use_latlon",
+        action="store_true",
+        help="Usar lon/lat en el plot.",
+    )
+    latlon_group.add_argument(
+        "--no-use-latlon",
+        dest="use_latlon",
+        action="store_false",
+        help="No usar lon/lat; representar en coordenadas índice.",
+    )
+    parser.set_defaults(use_latlon=DEFAULT_USE_LATLON)
+
+    return parser
 
 
 # =============================================================================
@@ -49,8 +135,8 @@ def open_radar_zarr(path: Path) -> xr.Dataset:
 # OUTPUTS
 # =============================================================================
 
-def prepare_output_dir(path: Path) -> None:
-    if path.exists():
+def prepare_output_dir(path: Path, clean: bool = False) -> None:
+    if clean and path.exists():
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
 
@@ -87,12 +173,11 @@ def get_radar_cmap():
     ]
 
     cmap = ListedColormap(colors)
-    cmap.set_under("black")      # <12
-    cmap.set_over("#C8005A")     # >78
-    cmap.set_bad("#7f7f7f")      # NaN
+    cmap.set_under("black")
+    cmap.set_over("#C8005A")
+    cmap.set_bad("#7f7f7f")
 
     norm = BoundaryNorm(bounds, ncolors=cmap.N, clip=False)
-
     return cmap, norm, bounds
 
 
@@ -113,12 +198,18 @@ def create_radar_gif(
     Genera un GIF animado de la variable radar con escala discreta tipo radar.
     """
 
+    if var_name not in ds:
+        raise KeyError(f"La variable {var_name!r} no existe en el dataset.")
+
     da = ds[var_name]
+
+    if "time" not in da.dims:
+        raise ValueError(f"La variable {var_name!r} no tiene dimensión 'time'.")
 
     if start_time or end_time:
         da = da.sel(time=slice(start_time, end_time))
 
-    # Limpieza igual que en tu notebook:
+    # Limpieza:
     # 0.0 -> NaN
     da = da.where(da != 0.0, np.nan)
 
@@ -128,9 +219,10 @@ def create_radar_gif(
         raise ValueError("No hay datos en el rango temporal seleccionado.")
 
     print(f"Número de frames: {len(times)}")
+    print(f"Primer tiempo: {times[0]}")
+    print(f"Último tiempo: {times[-1]}")
 
     cmap, norm, bounds = get_radar_cmap()
-
     frames = []
 
     for i, t in enumerate(times):
@@ -142,6 +234,11 @@ def create_radar_gif(
         ax.set_facecolor("black")
 
         if use_latlon:
+            if "lon" not in ds or "lat" not in ds:
+                raise KeyError(
+                    "Se ha pedido --use-latlon pero el dataset no contiene 'lon' y 'lat'."
+                )
+
             mesh = ax.pcolormesh(
                 ds["lon"].values,
                 ds["lat"].values,
@@ -159,6 +256,8 @@ def create_radar_gif(
                 cmap=cmap,
                 norm=norm,
             )
+            ax.set_xlabel("X", color="white")
+            ax.set_ylabel("Y", color="white")
 
         ax.set_title(str(t), color="white")
         ax.tick_params(colors="white")
@@ -203,19 +302,22 @@ def create_radar_gif(
 # =============================================================================
 
 def main() -> None:
-    prepare_output_dir(OUTPUT_DIR)
+    parser = build_parser()
+    args = parser.parse_args()
 
-    ds = open_radar_zarr(ZARR_PATH)
+    prepare_output_dir(args.output_gif.parent, clean=args.clean_output)
+
+    ds = open_radar_zarr(args.zarr_path)
     print(ds)
 
     create_radar_gif(
         ds=ds,
-        var_name=VAR_NAME,
-        output_gif=OUTPUT_GIF,
-        start_time=START_TIME,
-        end_time=END_TIME,
-        fps=FPS,
-        use_latlon=USE_LATLON,
+        var_name=args.var_name,
+        output_gif=args.output_gif,
+        start_time=args.start_time,
+        end_time=args.end_time,
+        fps=args.fps,
+        use_latlon=args.use_latlon,
     )
 
 

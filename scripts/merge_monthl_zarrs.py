@@ -17,7 +17,7 @@ from zarr.codecs import ZstdCodec
 INPUT_DIR = Path("/lustre/utmp/std/MLCAST_radar_data/outputs/monthly_v3")
 OUTPUT_ZARR = Path(
     "/perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity/"
-    "ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2023_2.zarr"
+    "ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr"
 )
 
 VAR_NAME = "equivalent_reflectivity_factor"

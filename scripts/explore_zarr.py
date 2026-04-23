@@ -14,7 +14,7 @@ from mlcast_dataset_es_aemet_reflectivity.radar_inspection import (
 # =============================================================================
 
 # Cambia esta ruta a tu store Zarr
-ZARR_PATH = Path("./ES-AEMET-radar_reflectivity-ppi_ZAR_v3.zarr")
+ZARR_PATH = Path("./ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr/")
 
 # Variable principal a explorar
 VAR_NAME = "equivalent_reflectivity_factor"
@@ -84,7 +84,7 @@ def main() -> None:
     print("\n=== DATA VARS ===")
     for v in ds.data_vars:
         chunks = getattr(ds[v], "chunks", None)
-        print(f"{v}: shape={ds[v].shape}, dtype={ds[v].dtype}, chunks={chunks}")
+        #print(f"{v}: shape={ds[v].shape}, dtype={ds[v].dtype}, chunks={chunks}")
 
     if VAR_NAME not in ds:
         raise KeyError(f"No existe la variable '{VAR_NAME}' en el dataset")
