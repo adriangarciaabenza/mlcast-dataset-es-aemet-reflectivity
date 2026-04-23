@@ -1,8 +1,0 @@
-python scripts/plot_zarr_gif.py \
-  --zarr-path ./ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr \
-  --var-name equivalent_reflectivity_factor \
-  --output-gif ./outputs/radar_ZAR_20240630.gif \
-  --start-time "2024-06-30T12:00:00" \
-  --end-time "2024-06-30T23:59:00" \
-  --fps 4 \
-  --use-latlon
