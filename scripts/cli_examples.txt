@@ -28,3 +28,7 @@ python scripts/plot_zarr_gif.py \
   --draw-provinces \
   --start-time "2024-06-30T12:00:00" \
   --end-time "2024-06-30T23:59:00" 
+
+python inspect_mlcast_issue_metadata.py \
+  --zarr-path ./ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr \
+  --var-name equivalent_reflectivity_factor
