@@ -1,25 +1,45 @@
 # mlcast-dataset-ES-AEMET-reflectivity
 
-This repository contains the code used to download AEMET radar products and convert them into an MLCAST-style Zarr dataset.
+Code to download AEMET weather-radar products and convert them into an
+MLCast-compatible Zarr dataset.
 
-## What the pipeline does
+The current configuration generates **PPI equivalent reflectivity** for the
+single AEMET radar `ZAR` (Zaragoza). It is not a national radar composite.
+The archive configured in `configs/default_v2.yaml` and
+`configs/default_v3.yaml` covers 2020-01-01 through 2024-01-01.
 
-1. Download radar files from the AEMET Big Data API in hourly windows.
-2. Retry automatically when the API returns HTTP 429.
-3. Standardize the NetCDF files into a common radar dataset structure.
-4. Build temporary chunk-level Zarr stores.
-5. Append each chunk sequentially into a final Zarr dataset to avoid excessive memory use.
-6. Run quick validation and create simple diagnostic plots.
+## Pipeline
+
+For each hourly time window, the pipeline:
+
+1. Downloads NetCDF radar files from the AEMET Big Data API.
+2. Retries requests that fail with HTTP 429 using exponential backoff.
+3. Standardizes the radar variable to `(time, y, x)` and adds `lat`, `lon`
+   and `spatial_ref` metadata.
+4. Appends the result to a final Zarr v2 or v3 store.
+5. Optionally inspects values and the generated metadata.
+
+Missing or failed hourly windows must be checked before publishing the
+resulting dataset. The output should not be considered complete without a
+validation report and a record of unavailable time steps.
 
 ## Repository structure
 
 ```text
-src/mlcast_dataset_es_aemet_reflectivity/
-  data_handler.py      # API download helpers
-  radar_to_zarr.py     # standardization, metadata, Zarr writing, validation and plotting
-  pipeline.py          # sequential chunked build pipeline
+configs/
+  default_v2.yaml       # Zarr v2 configuration template
+  default_v3.yaml       # Zarr v3 configuration for the current archive
+  tests/                # small configurations for local checks
 scripts/
-  build_dataset.py     # example entrypoint
+  build_zarr.py         # main CLI entry point
+  explore_zarr.py       # inspect a generated Zarr store
+  plot_zarr_gif*.py     # visualization helpers
+src/mlcast_dataset_es_aemet_reflectivity/
+  data_handler.py       # AEMET API download helpers
+  pipeline_zarr2.py     # sequential Zarr v2 pipeline
+  pipeline_zarr3.py     # sequential, sharded Zarr v3 pipeline
+  radar_processing.py   # standardization and Zarr preparation
+  radar_inspection.py   # validation, diagnostics and plotting
 ```
 
 ## Installation
@@ -27,32 +47,72 @@ scripts/
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
-## Required environment variable
+Use a fixed environment for production builds. In particular, the Zarr v3
+pipeline is developed against the Zarr 3.x API.
 
-The pipeline expects the AEMET API key in an environment variable:
+## AEMET credentials
+
+An AEMET Big Data API key is required. Do not commit it to the repository or
+place it in a script:
 
 ```bash
 export AEMET_API_KEY="your_api_key_here"
 ```
 
-## Example execution
+The [AEMET Big Data platform](http://bigdata.aemet.es/bigdata/inicio) is for
+internal access. If you are interested in reproducing the dataset preparation,
+please contact Adrián García
+(`agarciaa@aemet.es`) or Jaime Castro (`jcastroa@aemet.es`).
+
+If a key has ever been committed, revoke or rotate it even if it was later
+removed from the current working tree.
+
+## Build a dataset
+
+The main entry point accepts defaults, a YAML configuration and command-line
+overrides. Command-line values take precedence over YAML values.
+
+Example using Zarr v3:
 
 ```bash
-python scripts/build_dataset.py
+python scripts/build_zarr.py --config configs/default_v3.yaml
 ```
 
-## Notes
+Small local test:
 
-- The original hard-coded API key has been removed from the repository and replaced by `AEMET_API_KEY`.
-- The current example is configured for the PPI reflectivity product over radar `ZAR`.
-- The dataset identifier and metadata fields can be adapted for another radar, product or naming convention.
+```bash
+python scripts/build_zarr.py --config configs/tests/small_test_v3.yaml
+```
 
-## Suggested next improvements
+The output path, time range, radar, product, compression and MLCAST metadata
+are defined in the selected YAML file. The generated Zarr stores and local
+working data are intentionally excluded from Git.
 
-- Move the example configuration to a YAML or TOML file.
-- Add tests for metadata and Zarr structure.
-- Add CI to validate formatting and a small synthetic sample.
-- Expose a CLI with `argparse` or `typer`.
+## Inspect the output
+
+```bash
+python scripts/explore_zarr.py \
+  --zarr-path ./ES-AEMET-radar_reflectivity-ppi_ZAR_v3.zarr \
+  --var-name equivalent_reflectivity_factor
+```
+
+The main variable is expected to have:
+
+```text
+equivalent_reflectivity_factor(time, y, x)
+```
+
+Values are stored as `float32`; missing or invalid measurements are represented
+by `NaN`. The dataset includes CF metadata, geographic coordinates and a CRS
+in `spatial_ref`.
+
+## Data and code licensing
+
+The generated dataset is configured with `CC-BY-4.0` attribution metadata.
+Confirm the applicable AEMET terms and access conditions before distribution.
+The repository itself should include an explicit license for its source code
+before publication.
