@@ -1,15 +1,42 @@
-python generate_monthly_configs.py --start_year 2024 --end_year 2024 \
+python generate_monthly_configs.py --start_year 2020 --end_year 2024 \
     --project_dir /perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity \
-    --config_dir /perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity/configs/monthly_v3 \
-    --output_dir /lustre/utmp/std/MLCAST_radar_data/outputs/monthly_v3 \
+    --config_dir /perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity/configs/monthly_v4 \
+    --output_dir /lustre/utmp/std/MLCAST_radar_data/outputs/monthly_v4 \
+    --create_zip false
+
+python generate_monthly_configs_SRI.py --start_year 2020 --end_year 2024 \
+    --project_dir /perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity \
+    --config_dir /perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity/configs/monthly_SRI_v1 \
+    --output_dir /lustre/utmp/std/MLCAST_radar_data/outputs/monthly_SRI_v1 \
     --create_zip false
 
 python merge_monthly_zarrs.py \
     --input_dir /lustre/utmp/std/MLCAST_radar_data/outputs/monthly_v3 \
     --output_zarr /path/to/final_merged.zarr
 
+python scripts/merge_monthly_zarrs_with_missing_updated.py \
+  --input_dir /lustre/utmp/std/MLCAST_radar_data/outputs/monthly_SRI_v1 \
+  --output_zarr /lustre/utmp/std/MLCAST_radar_data/ES-AEMET-rainfall_rate-sri_ZAR_2020-2024_v1.zarr
+  --var-name rainfall_rate \
+  --standard-name rainfall_flux \
+  --long-name "Surface rainfall intensity estimated from weather radar" \
+  --units "mm/h"
+
 python scripts/explore_zarr.py \
     --zarr_path ./ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr
+
+python scripts/explore_zarr.py \
+    --zarr_path /lustre/utmp/std/MLCAST_radar_data/events/emilia/composite/emilia_sri_composite.zarr \
+    --var_name rainfall_rate \
+
+python scripts/explore_zarr.py \
+    --zarr_path /lustre/utmp/std/MLCAST_radar_data/ES-AEMET-rainfall_rate-sri_ZAR_2020-2024_v1.zarr
+
+python scripts/explore_zarr.py \
+  --zarr_path /lustre/utmp/std/MLCAST_radar_data/ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024_v4.zarr \
+  --var_name dbz \
+  --expected_freq 10min \
+  --plot_missing_times true
 
 python scripts/plot_zarr_gif.py \
   --zarr-path ./ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr \
@@ -29,6 +56,25 @@ python scripts/plot_zarr_gif.py \
   --start-time "2024-06-30T12:00:00" \
   --end-time "2024-06-30T23:59:00" 
 
+python scripts/plot_zarr_gif.py \
+  --zarr-path /lustre/utmp/std/MLCAST_radar_data/ES-AEMET-radar_reflectivity-ppi_ZAR_v4.zarr \
+  --var-name reflectivity \
+  --output-gif ./outputs/radar_ZAR_EPSG25830_with_provinces.gif \
+  --use-cartopy \
+  --draw-provinces \
+
+
 python inspect_mlcast_issue_metadata.py \
   --zarr-path ./ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr \
   --var-name equivalent_reflectivity_factor
+
+python inspect_mlcast_issue_metadata.py \
+  --zarr-path /lustre/utmp/std/MLCAST_radar_data/ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024_v3.zarr \
+  --var-name dbz
+
+python convert_dbz_to_rainfall_rate.py \
+  --input-zarr /lustre/utmp/std/MLCAST_radar_data/ES-AEMET-rainfall_rate-sri_ZAR_2020-2024_v1.zarr \
+  --output-zarr /lustre/utmp/std/MLCAST_radar_data/ES-AEMET-rainfall_rate-sri_ZAR_2020-2024_v1_converted.zarr \
+  --marshall-palmer-a 200 \
+  --marshall-palmer-b 1.6 \
+  --overwrite

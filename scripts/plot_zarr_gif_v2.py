@@ -21,7 +21,7 @@ from cartopy.feature import ShapelyFeature
 # =============================================================================
 
 DEFAULT_ZARR_PATH = Path("./ES-AEMET-radar_reflectivity-ppi_ZAR.zarr")
-DEFAULT_VAR_NAME = "reflectivity"
+DEFAULT_VAR_NAME = "equivalent_reflectivity_factor"
 DEFAULT_OUTPUT_GIF = Path("./outputs/radar.gif")
 DEFAULT_FPS = 4
 DEFAULT_USE_LATLON = True
@@ -109,10 +109,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Plot with Cartopy.",
     )
 
+    # -------------------------------------------------------------------------
+    # Administrative lines / provinces
+    # -------------------------------------------------------------------------
     parser.add_argument(
         "--draw-provinces",
         action="store_true",
-        help="Overlay internal administrative lines from Natural Earth.",
+        help=(
+            "Overlay internal administrative lines from Natural Earth "
+            "(via Cartopy)."
+        ),
     )
     parser.add_argument(
         "--draw-shapefile",
@@ -138,6 +144,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Line width for the external shapefile.",
     )
 
+    # -------------------------------------------------------------------------
+    # Orography
+    # -------------------------------------------------------------------------
     parser.add_argument(
         "--draw-orography",
         action="store_true",
@@ -155,6 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
             "'shapefile' = external shapefile."
         ),
     )
+
     parser.add_argument(
         "--orography-file",
         type=Path,
@@ -167,6 +177,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="orography",
         help="Name of the orography variable in the external file.",
     )
+
     parser.add_argument(
         "--orography-shapefile",
         type=Path,
@@ -207,34 +218,6 @@ def open_radar_zarr(path: Path) -> xr.Dataset:
     return xr.open_zarr(path, consolidated=True)
 
 
-def get_dataset_crs(ds: xr.Dataset):
-    """
-    Return the Cartopy CRS corresponding to the dataset grid.
-
-    Supported cases:
-    - EPSG:25830 -> projected UTM 30N grid
-    - EPSG:4326  -> geographic lon/lat grid
-    """
-    if "spatial_ref" not in ds:
-        return ccrs.PlateCarree()
-
-    epsg_code = ds["spatial_ref"].attrs.get("epsg_code", None)
-
-    if epsg_code is None:
-        return ccrs.PlateCarree()
-
-    epsg_code = str(epsg_code).upper().replace("EPSG:", "")
-
-    if epsg_code == "25830":
-        return ccrs.epsg(25830)
-
-    if epsg_code == "4326":
-        return ccrs.PlateCarree()
-
-    print(f"Warning: unsupported EPSG code {epsg_code!r}. Falling back to PlateCarree.")
-    return ccrs.PlateCarree()
-
-
 # =============================================================================
 # COLORMAP
 # =============================================================================
@@ -243,17 +226,17 @@ def get_radar_cmap():
     bounds = [12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 78]
 
     colors = [
-        "#0000fc",
-        "#0094fc",
-        "#00fcfc",
-        "#438323",
-        "#00c000",
-        "#00ff00",
-        "#ffff00",
-        "#ffbb00",
-        "#ff7f00",
-        "#ff0000",
-        "#C8005A",
+        "#0000fc",  # 12-18
+        "#0094fc",  # 18-24
+        "#00fcfc",  # 24-30
+        "#438323",  # 30-36
+        "#00c000",  # 36-42
+        "#00ff00",  # 42-48
+        "#ffff00",  # 48-54
+        "#ffbb00",  # 54-60
+        "#ff7f00",  # 60-66
+        "#ff0000",  # 66-72
+        "#C8005A",  # 72-78 and >78
     ]
 
     cmap = ListedColormap(colors)
@@ -270,6 +253,9 @@ def get_radar_cmap():
 # =============================================================================
 
 def add_default_admin1_lines(ax, scale: str = "10m") -> None:
+    """
+    Default internal administrative lines from Natural Earth/Cartopy.
+    """
     feature = cfeature.NaturalEarthFeature(
         category="cultural",
         name="admin_1_states_provinces_lines",
@@ -310,6 +296,10 @@ def add_shapefile(
 
 
 def add_default_orography(ax, scale: str = "10m") -> None:
+    """
+    Add a default general physical relief layer from Natural Earth.
+    This is not a detailed raster orography; it is a vector physical reference.
+    """
     try:
         feature = cfeature.NaturalEarthFeature(
             category="physical",
@@ -343,36 +333,37 @@ def add_orography_from_file(
 
     ds_oro = xr.open_dataset(orography_file)
 
-    try:
-        if var_name not in ds_oro:
-            raise KeyError(
-                f"Orography variable {var_name!r} does not exist in {orography_file}"
-            )
-
-        oro = ds_oro[var_name]
-
-        lon_name = "lon" if "lon" in oro.coords else "longitude"
-        lat_name = "lat" if "lat" in oro.coords else "latitude"
-
-        if lon_name not in oro.coords or lat_name not in oro.coords:
-            raise KeyError(
-                "lon/lat or longitude/latitude coordinates were not found "
-                "in the orography file."
-            )
-
-        ax.contour(
-            oro[lon_name].values,
-            oro[lat_name].values,
-            oro.values,
-            levels=[500, 1000, 1500, 2000],
-            colors="white",
-            linewidths=0.4,
-            alpha=0.5,
-            transform=ccrs.PlateCarree(),
-            zorder=3,
-        )
-    finally:
+    if var_name not in ds_oro:
         ds_oro.close()
+        raise KeyError(
+            f"Orography variable {var_name!r} does not exist in {orography_file}"
+        )
+
+    oro = ds_oro[var_name]
+
+    lon_name = "lon" if "lon" in oro.coords else "longitude"
+    lat_name = "lat" if "lat" in oro.coords else "latitude"
+
+    if lon_name not in oro.coords or lat_name not in oro.coords:
+        ds_oro.close()
+        raise KeyError(
+            "lon/lat or longitude/latitude coordinates were not found "
+            "in the orography file."
+        )
+
+    ax.contour(
+        oro[lon_name].values,
+        oro[lat_name].values,
+        oro.values,
+        levels=[500, 1000, 1500, 2000],
+        colors="white",
+        linewidths=0.4,
+        alpha=0.5,
+        transform=ccrs.PlateCarree(),
+        zorder=3,
+    )
+
+    ds_oro.close()
 
 
 def add_orography(
@@ -428,42 +419,37 @@ def plot_frame_cartopy(
     orography_edgecolor: str = "white",
     orography_linewidth: float = 0.5,
 ):
-    if "x" not in ds.coords or "y" not in ds.coords:
-        raise KeyError(
-            "EPSG:25830 plotting requires 'x' and 'y' coordinates in the dataset."
-        )
-
-    data_crs = ccrs.UTM(zone=30, southern_hemisphere=False)
-
     fig = plt.figure(figsize=(7, 6), facecolor="black")
-    ax = plt.axes(projection=data_crs)
+    ax = plt.axes(projection=ccrs.PlateCarree())
     ax.set_facecolor("black")
 
-    x = ds["x"].values
-    y = ds["y"].values
+    if "lon" not in ds or "lat" not in ds:
+        raise KeyError(
+            "Using Cartopy requires 'lon' and 'lat' coordinates in the dataset."
+        )
 
-    dx = float(np.nanmedian(np.diff(x)))
-    dy = float(np.nanmedian(np.diff(y)))
-
-    extent = [
-        float(np.nanmin(x) - dx / 2),
-        float(np.nanmax(x) + dx / 2),
-        float(np.nanmin(y) - dy / 2),
-        float(np.nanmax(y) + dy / 2),
-    ]
-
-    mesh = ax.imshow(
+    mesh = ax.pcolormesh(
+        ds["lon"].values,
+        ds["lat"].values,
         data.values,
-        origin="lower",
-        extent=extent,
+        shading="auto",
         cmap=cmap,
         norm=norm,
-        transform=data_crs,
-        interpolation="nearest",
+        transform=ccrs.PlateCarree(),
         zorder=1,
     )
 
-    ax.set_extent(extent, crs=data_crs)
+    lon_vals = ds["lon"].values
+    lat_vals = ds["lat"].values
+    ax.set_extent(
+        [
+            float(np.nanmin(lon_vals)),
+            float(np.nanmax(lon_vals)),
+            float(np.nanmin(lat_vals)),
+            float(np.nanmax(lat_vals)),
+        ],
+        crs=ccrs.PlateCarree(),
+    )
 
     ax.add_feature(cfeature.COASTLINE.with_scale("10m"), linewidth=0.6, zorder=5)
     ax.add_feature(cfeature.BORDERS.with_scale("10m"), linewidth=0.5, zorder=5)
@@ -552,26 +538,14 @@ def plot_frame_basic(
         ax.set_xlabel("Lon", color="white")
         ax.set_ylabel("Lat", color="white")
     else:
-        if "x" in ds.coords and "y" in ds.coords:
-            mesh = ax.pcolormesh(
-                ds["x"].values,
-                ds["y"].values,
-                data.values,
-                shading="auto",
-                cmap=cmap,
-                norm=norm,
-            )
-            ax.set_xlabel("X", color="white")
-            ax.set_ylabel("Y", color="white")
-        else:
-            mesh = ax.imshow(
-                data.values,
-                origin="lower",
-                cmap=cmap,
-                norm=norm,
-            )
-            ax.set_xlabel("X index", color="white")
-            ax.set_ylabel("Y index", color="white")
+        mesh = ax.imshow(
+            data.values,
+            origin="lower",
+            cmap=cmap,
+            norm=norm,
+        )
+        ax.set_xlabel("X", color="white")
+        ax.set_ylabel("Y", color="white")
 
     ax.set_title(str(t), color="white")
     ax.tick_params(colors="white")
@@ -636,6 +610,7 @@ def create_radar_gif(
     if start_time or end_time:
         da = da.sel(time=slice(start_time, end_time))
 
+    # 0.0 -> NaN
     da = da.where(da != 0.0, np.nan)
 
     times = da.time.values

@@ -87,17 +87,20 @@ def add_crs_metadata(ds, epsg: str = "EPSG:4326"):
     """
     crs = CRS.from_user_input(epsg)
 
-    ds["spatial_ref"] = xr.DataArray(
-        0,
-        attrs={
-            "spatial_ref": crs.to_wkt(),
-            "crs_wkt": crs.to_wkt(),
-            "grid_mapping_name": "latitude_longitude",
-            "epsg_code": epsg,
-            "semi_major_axis": crs.ellipsoid.semi_major_metre,
-            "inverse_flattening": crs.ellipsoid.inverse_flattening,
-        },
-    )
+    attrs = {
+        "spatial_ref": crs.to_wkt(),
+        "crs_wkt": crs.to_wkt(),
+        "epsg_code": epsg,
+    }
+
+    if crs.is_projected:
+        attrs["grid_mapping_name"] = "transverse_mercator"
+    else:
+        attrs["grid_mapping_name"] = "latitude_longitude"
+        attrs["semi_major_axis"] = crs.ellipsoid.semi_major_metre
+        attrs["inverse_flattening"] = crs.ellipsoid.inverse_flattening
+
+    ds["spatial_ref"] = xr.DataArray(0, attrs=attrs)
     return ds
 
 

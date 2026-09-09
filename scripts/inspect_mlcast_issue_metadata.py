@@ -9,7 +9,7 @@ import pandas as pd
 import xarray as xr
 
 
-DEFAULT_ZARR_PATH = Path("./ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr/")
+DEFAULT_ZARR_PATH = Path("/lustre/utmp/std/MLCAST_radar_data/ES-AEMET-rainfall_rate-sri_ZAR_2020-2024_v1_kg.zarr")
 DEFAULT_VAR_NAME = "equivalent_reflectivity_factor"
 
 

@@ -15,23 +15,41 @@ from zarr.codecs import ZstdCodec
 # =============================================================================
 # DEFAULT CONFIG
 # =============================================================================
-DEFAULT_INPUT_DIR = Path("/lustre/utmp/std/MLCAST_radar_data/outputs/monthly_v3")
+
+DEFAULT_INPUT_DIR = Path("/lustre/utmp/std/MLCAST_radar_data/outputs/monthly_v4")
 DEFAULT_OUTPUT_ZARR = Path(
-    "/perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity/"
-    "ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024.zarr"
+    "/lustre/utmp/std/MLCAST_radar_data/"
+    "ES-AEMET-radar_reflectivity-ppi_ZAR_2020-2024_v4.zarr"
 )
 
-VAR_NAME = "equivalent_reflectivity_factor"
+DEFAULT_VAR_NAME = "reflectivity"
+DEFAULT_EPSG = "EPSG:25830"
+
 TIME_FREQ = "10min"
 TIME_CHUNK = 1
 SHARD_TIME = 144
-COMPRESSION_LEVEL = 5
+COMPRESSION_LEVEL = 12
 ZARR_FORMAT = 3
+
+VAR_NAME = DEFAULT_VAR_NAME
+EPSG = DEFAULT_EPSG
 
 
 # =============================================================================
 # HELPERS
 # =============================================================================
+
+def normalize_epsg(epsg: str) -> str:
+    epsg = str(epsg).strip().upper()
+    if epsg.startswith("EPSG:"):
+        return epsg
+    return f"EPSG:{epsg}"
+
+
+def is_projected_epsg(epsg: str) -> bool:
+    return normalize_epsg(epsg) != "EPSG:4326"
+
+
 def _remove_path(path: Path) -> None:
     if path.exists():
         if path.is_dir():
@@ -54,8 +72,10 @@ def _find_input_zarrs(input_dir: Path) -> list[Path]:
 
 def _open_monthly_zarr(path: Path) -> xr.Dataset:
     ds = xr.open_zarr(path, consolidated=False)
+
     if VAR_NAME not in ds.data_vars:
         raise ValueError(f"{path}: does not contain variable '{VAR_NAME}'")
+
     return ds
 
 
@@ -83,7 +103,10 @@ def _ensure_lat_lon_as_coords(ds: xr.Dataset) -> xr.Dataset:
     if "time" in lon_data.dims:
         lon_data = lon_data.isel(time=0, drop=True)
 
-    to_drop = [v for v in ["lat", "lon", "latitude", "longitude"] if v in ds.data_vars]
+    to_drop = [
+        v for v in ["lat", "lon", "latitude", "longitude"]
+        if v in ds.data_vars
+    ]
     if to_drop:
         ds = ds.drop_vars(to_drop)
 
@@ -114,12 +137,17 @@ def _sort_and_drop_duplicate_times(ds: xr.Dataset) -> xr.Dataset:
     return ds.isel(time=unique_idx)
 
 
-def _set_cf_attrs(ds: xr.Dataset) -> xr.Dataset:
+def _set_cf_attrs(ds: xr.Dataset, epsg: str) -> xr.Dataset:
     ds = ds.copy()
+
+    epsg_norm = normalize_epsg(epsg)
+    projected = is_projected_epsg(epsg_norm)
 
     ds[VAR_NAME] = ds[VAR_NAME].astype(np.float32)
     ds[VAR_NAME].attrs.update(
         {
+            "var_name": VAR_NAME,
+            "long_name": "Radar reflectivity",
             "standard_name": "equivalent_reflectivity_factor",
             "units": "dBZ",
             "grid_mapping": "spatial_ref",
@@ -133,6 +161,49 @@ def _set_cf_attrs(ds: xr.Dataset) -> xr.Dataset:
                 "standard_name": "time",
                 "long_name": "time",
             }
+        )
+
+    if "x" in ds.coords and "y" in ds.coords:
+        if projected:
+            ds["x"].attrs.update(
+                {
+                    "standard_name": "projection_x_coordinate",
+                    "long_name": "x coordinate of projection",
+                    "units": "m",
+                    "axis": "X",
+                }
+            )
+            ds["y"].attrs.update(
+                {
+                    "standard_name": "projection_y_coordinate",
+                    "long_name": "y coordinate of projection",
+                    "units": "m",
+                    "axis": "Y",
+                }
+            )
+        else:
+            ds["x"].attrs.update(
+                {
+                    "standard_name": "longitude",
+                    "long_name": "longitude",
+                    "units": "degrees_east",
+                    "axis": "X",
+                }
+            )
+            ds["y"].attrs.update(
+                {
+                    "standard_name": "latitude",
+                    "long_name": "latitude",
+                    "units": "degrees_north",
+                    "axis": "Y",
+                }
+            )
+
+    if "spatial_ref" in ds:
+        ds["spatial_ref"].attrs.setdefault("epsg_code", epsg_norm)
+        ds["spatial_ref"].attrs.setdefault(
+            "grid_mapping_name",
+            "transverse_mercator" if projected else "latitude_longitude",
         )
 
     return ds
@@ -191,13 +262,26 @@ def _build_encoding(y_size: int, x_size: int) -> dict:
             "dtype": np.float32,
             "_FillValue": np.float32(np.nan),
         },
+        "x": {
+            "compressors": (compressor,),
+            "chunks": (x_size,),
+            "dtype": np.float64,
+        },
+        "y": {
+            "compressors": (compressor,),
+            "chunks": (y_size,),
+            "dtype": np.float64,
+        },
     }
 
 
 # =============================================================================
 # STEP 1. SCAN GLOBAL TIMES
 # =============================================================================
-def _collect_global_time_info(zarrs: list[Path]) -> tuple[pd.DatetimeIndex, set[np.datetime64]]:
+
+def _collect_global_time_info(
+    zarrs: list[Path],
+) -> tuple[pd.DatetimeIndex, set[np.datetime64]]:
     all_times = []
     union_times: set[np.datetime64] = set()
 
@@ -207,8 +291,10 @@ def _collect_global_time_info(zarrs: list[Path]) -> tuple[pd.DatetimeIndex, set[
         try:
             ds = _sort_and_drop_duplicate_times(ds)
             t = pd.DatetimeIndex(ds["time"].values)
+
             if len(t) == 0:
                 continue
+
             all_times.append((t[0], t[-1]))
             union_times.update(t.values)
         finally:
@@ -227,13 +313,18 @@ def _collect_global_time_info(zarrs: list[Path]) -> tuple[pd.DatetimeIndex, set[
 # =============================================================================
 # STEP 2. CREATE GLOBAL TEMPLATE
 # =============================================================================
+
 def _build_template_dataset(
     first_ds: xr.Dataset,
     full_time: pd.DatetimeIndex,
+    epsg: str,
 ) -> xr.Dataset:
+    epsg_norm = normalize_epsg(epsg)
+    projected = is_projected_epsg(epsg_norm)
+
     first_ds = _ensure_lat_lon_as_coords(first_ds)
     first_ds = _sort_and_drop_duplicate_times(first_ds)
-    first_ds = _set_cf_attrs(first_ds)
+    first_ds = _set_cf_attrs(first_ds, epsg=epsg_norm)
     first_ds = _clear_inherited_encodings(first_ds)
 
     y_size = first_ds.sizes["y"]
@@ -254,7 +345,11 @@ def _build_template_dataset(
             ),
         },
         coords={
-            "time": xr.DataArray(full_time, dims=("time",), attrs=first_ds["time"].attrs),
+            "time": xr.DataArray(
+                full_time,
+                dims=("time",),
+                attrs=first_ds["time"].attrs,
+            ),
             "y": first_ds["y"],
             "x": first_ds["x"],
             "lat": first_ds["lat"],
@@ -265,6 +360,13 @@ def _build_template_dataset(
 
     if "spatial_ref" in first_ds:
         template["spatial_ref"] = first_ds["spatial_ref"]
+
+    if "spatial_ref" in template:
+        template["spatial_ref"].attrs.setdefault("epsg_code", epsg_norm)
+        template["spatial_ref"].attrs.setdefault(
+            "grid_mapping_name",
+            "transverse_mercator" if projected else "latitude_longitude",
+        )
 
     return template
 
@@ -279,17 +381,28 @@ def _initialize_store(template: xr.Dataset, output_zarr: Path) -> None:
     output_zarr.parent.mkdir(parents=True, exist_ok=True)
 
     coords_ds = template.drop_vars([VAR_NAME], errors="ignore")
+
+    coords_encoding = {
+        key: value
+        for key, value in encoding.items()
+        if key in coords_ds.variables
+    }
+
     coords_ds.to_zarr(
         str(output_zarr),
         mode="w",
         consolidated=False,
         zarr_format=ZARR_FORMAT,
-        encoding={k: v for k, v in encoding.items() if k in coords_ds.variables},
+        encoding=coords_encoding,
     )
 
     var_only = xr.Dataset(
         data_vars={VAR_NAME: template[VAR_NAME]},
-        coords={"time": template["time"], "y": template["y"], "x": template["x"]},
+        coords={
+            "time": template["time"],
+            "y": template["y"],
+            "x": template["x"],
+        },
         attrs=template.attrs,
     )
 
@@ -309,6 +422,7 @@ def _initialize_store(template: xr.Dataset, output_zarr: Path) -> None:
 # =============================================================================
 # STEP 3. WRITE BLOCK BY BLOCK
 # =============================================================================
+
 def _regularize_month_to_local_full_time(ds: xr.Dataset) -> xr.Dataset:
     ds = _sort_and_drop_duplicate_times(ds)
 
@@ -321,8 +435,8 @@ def _regularize_month_to_local_full_time(ds: xr.Dataset) -> xr.Dataset:
         end=original_time[-1],
         freq=TIME_FREQ,
     )
-    ds = ds.reindex(time=local_full_time)
-    return ds
+
+    return ds.reindex(time=local_full_time)
 
 
 def _clip_block_to_global_time(
@@ -379,13 +493,15 @@ def _write_one_month(
     full_time: pd.DatetimeIndex,
     month_idx: int,
     n_months: int,
+    epsg: str,
 ) -> None:
     print(f"\n[write {month_idx}/{n_months}] {path}")
+
     ds = _open_monthly_zarr(path)
     try:
         ds = _ensure_lat_lon_as_coords(ds)
         ds = _sort_and_drop_duplicate_times(ds)
-        ds = _set_cf_attrs(ds)
+        ds = _set_cf_attrs(ds, epsg=epsg)
         ds = _clear_inherited_encodings(ds)
         ds = _regularize_month_to_local_full_time(ds)
 
@@ -455,17 +571,24 @@ def _write_one_month(
 
 
 # =============================================================================
-# MAIN
+# MAIN MERGE FUNCTION
 # =============================================================================
+
 def merge_monthly_zarrs_from_directory_by_region(
     input_dir: Path,
     output_zarr: Path,
+    epsg: str = DEFAULT_EPSG,
 ) -> None:
+    epsg_norm = normalize_epsg(epsg)
+
     input_zarrs = _find_input_zarrs(input_dir)
 
     print("Found input Zarr stores:")
     for z in input_zarrs:
         print(f"  - {z}")
+
+    print(f"\nVariable name: {VAR_NAME}")
+    print(f"Dataset CRS:   {epsg_norm}")
 
     print("\n[1/3] Scanning global times...")
     full_time, union_times = _collect_global_time_info(input_zarrs)
@@ -475,7 +598,7 @@ def merge_monthly_zarrs_from_directory_by_region(
     print("\n[2/3] Building global template...")
     first_ds = _open_monthly_zarr(input_zarrs[0])
     try:
-        template = _build_template_dataset(first_ds, full_time)
+        template = _build_template_dataset(first_ds, full_time, epsg=epsg_norm)
     finally:
         first_ds.close()
 
@@ -484,7 +607,14 @@ def merge_monthly_zarrs_from_directory_by_region(
 
     print("\n[3/3] Writing temporal blocks...")
     for i, path in enumerate(input_zarrs, start=1):
-        _write_one_month(path, output_zarr, full_time, i, len(input_zarrs))
+        _write_one_month(
+            path=path,
+            output_zarr=output_zarr,
+            full_time=full_time,
+            month_idx=i,
+            n_months=len(input_zarrs),
+            epsg=epsg_norm,
+        )
 
     print(f"\n[OK] Final Zarr store written to: {output_zarr}")
 
@@ -492,22 +622,37 @@ def merge_monthly_zarrs_from_directory_by_region(
 # =============================================================================
 # CLI
 # =============================================================================
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Merge monthly radar Zarr stores into a single Zarr store using region writes."
     )
 
     parser.add_argument(
+        "--input-dir",
         "--input_dir",
         type=str,
         default=str(DEFAULT_INPUT_DIR),
         help="Directory containing the monthly input Zarr stores.",
     )
     parser.add_argument(
+        "--output-zarr",
         "--output_zarr",
         type=str,
         default=str(DEFAULT_OUTPUT_ZARR),
         help="Path to the output merged Zarr store.",
+    )
+    parser.add_argument(
+        "--var-name",
+        type=str,
+        default=DEFAULT_VAR_NAME,
+        help="Name of the radar variable to merge.",
+    )
+    parser.add_argument(
+        "--epsg",
+        type=str,
+        default=DEFAULT_EPSG,
+        help="Dataset CRS. Examples: EPSG:4326, 4326, EPSG:25830 or 25830.",
     )
 
     return parser
@@ -517,9 +662,16 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
+    global VAR_NAME
+    global EPSG
+
+    VAR_NAME = args.var_name
+    EPSG = normalize_epsg(args.epsg)
+
     merge_monthly_zarrs_from_directory_by_region(
         input_dir=Path(args.input_dir),
         output_zarr=Path(args.output_zarr),
+        epsg=EPSG,
     )
 
 

@@ -11,8 +11,8 @@ from pathlib import Path
 # =============================================================================
 
 DEFAULT_PROJECT_DIR = Path("/perm/pred/std/ML/MLCAST/mlcast-dataset-ES-AEMET-reflectivity")
-DEFAULT_CONFIG_DIR = DEFAULT_PROJECT_DIR / "configs/monthly_v4"
-DEFAULT_OUTPUT_DIR = Path("/lustre/utmp/std/MLCAST_radar_data/outputs/monthly_v4")
+DEFAULT_CONFIG_DIR = DEFAULT_PROJECT_DIR / "configs/monthly_SRI_v1"
+DEFAULT_OUTPUT_DIR = Path("/lustre/utmp/std/MLCAST_radar_data/outputs/monthly_SRI_v1")
 DEFAULT_START_YEAR = 2020
 DEFAULT_END_YEAR = 2024
 DEFAULT_CREATE_ZIP = True
@@ -53,24 +53,24 @@ def build_monthly_yaml_content(
     yaml_content = f"""
 zarr_version: 3
 
-workdir: "{project_dir}/workdir/monthly_v3/{name}"
+workdir: "{project_dir}/workdir/monthly_SRI_v1/{name}"
 zarr_out: "{output_dir}/radar_{name}.zarr"
 
 fechaini: "{start.strftime('%Y%m%dT%H%M%S')}"
 fechafin: "{end.strftime('%Y%m%dT%H%M%S')}"
 
-imagen: "PPI"
-configuracion: "Z_005_240"
+imagen: "SRI"
+configuracion: "Z_240"
 radar: "ZAR"
 epsg: "25830"
 
-var_name: "dbz"
-standard_name: "equivalent_reflectivity_factor"
+var_name: "rainfall_rate"
+standard_name: "rainfall_flux"
 
 mlcast_created_by: "Jaime Castro <jcastroa@aemet.es>; Adrián García <agarciaa@aemet.es>"
 mlcast_created_with: "https://github.com/mlcast-community/mlcast-dataset-ES-AEMET-reflectivity@v0.1.0"
 mlcast_dataset_version: "0.1.0"
-mlcast_dataset_identifier: "ES-AEMET-radar_reflectivity-ppi_ZAR"
+mlcast_dataset_identifier: "ES-AEMET-rainfall_rate-sri_ZAR"
 mlcast_dataset_identifier_format: "{{country_code}}-{{entity}}-{{physical_variable}}-{{common_name}}"
 
 license: "CC-BY-4.0"

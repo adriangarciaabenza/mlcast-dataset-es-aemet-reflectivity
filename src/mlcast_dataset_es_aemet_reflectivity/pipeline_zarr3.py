@@ -373,6 +373,7 @@ def run_pipeline_zarr3(config: RadarBuildConfigZarr3) -> None:
                 nc_files_chunk,
                 var_name=config.var_name,
                 standard_name=config.standard_name,
+                epsg=config.epsg,
                 verbose=False,
                 inspect_raw_fn=inspect_raw_radar_dataset if config.inspect else None,
             )

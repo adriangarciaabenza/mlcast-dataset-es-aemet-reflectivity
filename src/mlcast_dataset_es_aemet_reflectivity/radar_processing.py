@@ -7,7 +7,7 @@ from typing import Iterable
 import numpy as np
 import xarray as xr
 import zarr
-from pyproj import CRS
+from pyproj import CRS, Transformer
 
 from .utils import (
     _open_local_store,
@@ -64,7 +64,7 @@ def infer_radar_variable(ds: xr.Dataset) -> str:
     return candidates[0]
 
 
-def infer_lat_lon_names(ds: xr.Dataset) -> tuple[str, str]:
+def infer_lat_lon_names(ds: xr.Dataset) -> tuple[str | None, str | None]:
     lat_name = None
     lon_name = None
 
@@ -74,9 +74,6 @@ def infer_lat_lon_names(ds: xr.Dataset) -> tuple[str, str]:
             lat_name = name
         elif lname in {"lon", "longitude"}:
             lon_name = name
-
-    if lat_name is None or lon_name is None:
-        raise ValueError("lat/lon variables were not found in the dataset.")
 
     return lat_name, lon_name
 
@@ -135,12 +132,40 @@ def _lat_lon_to_2d(lat: xr.DataArray, lon: xr.DataArray) -> tuple[xr.DataArray, 
         f"Unsupported lat/lon format. lat.dims={lat.dims}, lon.dims={lon.dims}"
     )
 
+def _xy_to_lat_lon(
+    x: xr.DataArray,
+    y: xr.DataArray,
+    epsg: str,
+) -> tuple[xr.DataArray, xr.DataArray]:
+    """
+    Build 2D lat/lon auxiliary coordinates from 1D x/y coordinates.
+    """
+    crs_src = CRS.from_user_input(epsg)
+
+    xx, yy = np.meshgrid(x.values, y.values)
+
+    if crs_src.is_geographic:
+        lon2d = xx
+        lat2d = yy
+    else:
+        transformer = Transformer.from_crs(
+            crs_src,
+            CRS.from_epsg(4326),
+            always_xy=True,
+        )
+        lon2d, lat2d = transformer.transform(xx, yy)
+
+    lat = xr.DataArray(lat2d.astype("float64"), dims=("y", "x"))
+    lon = xr.DataArray(lon2d.astype("float64"), dims=("y", "x"))
+
+    return lat, lon
 
 def standardize_radar_dataset(
     ds: xr.Dataset,
     file_path: str | Path = "",
     var_name: str = DEFAULT_VAR_NAME,
     standard_name: str | None = DEFAULT_STANDARD_NAME,
+    epsg: str = "EPSG:4326",
 ) -> xr.Dataset:
     """
     Standardize a radar NetCDF into a Dataset with:
@@ -155,11 +180,34 @@ def standardize_radar_dataset(
     lat_name, lon_name = infer_lat_lon_names(ds)
 
     da = ds[radar_var]
-    lat = ds[lat_name]
-    lon = ds[lon_name]
 
-    da, lat, lon = _rename_spatial_dims(da, lat, lon)
-    lat2d, lon2d = _lat_lon_to_2d(lat, lon)
+    if lat_name is not None and lon_name is not None:
+        lat = ds[lat_name]
+        lon = ds[lon_name]
+
+        da, lat, lon = _rename_spatial_dims(da, lat, lon)
+        lat2d, lon2d = _lat_lon_to_2d(lat, lon)
+
+        y_values = ds["y"].values if "y" in ds.coords else np.arange(da.sizes["y"])
+        x_values = ds["x"].values if "x" in ds.coords else np.arange(da.sizes["x"])
+
+        lat_attrs = dict(lat.attrs)
+        lon_attrs = dict(lon.attrs)
+
+    else:
+        if "x" not in ds.coords or "y" not in ds.coords:
+            raise ValueError(
+                "The dataset has no lat/lon coordinates and no projected x/y coordinates."
+            )
+
+        da = da.transpose("time", "y", "x")
+        lat2d, lon2d = _xy_to_lat_lon(ds["x"], ds["y"], epsg=epsg)
+
+        y_values = ds["y"].values
+        x_values = ds["x"].values
+
+        lat_attrs = {}
+        lon_attrs = {}
 
     raw = np.asarray(da.values, dtype="float32").copy()
 
@@ -189,6 +237,7 @@ def standardize_radar_dataset(
         "add_offset",
         "scale_factor",
         "standard_name",
+        "var_name",
     ]:
         radar_attrs.pop(key, None)
 
@@ -200,15 +249,70 @@ def standardize_radar_dataset(
         },
         coords={
             "time": da["time"].values,
-            "y": np.arange(raw.shape[1], dtype=np.int32),
-            "x": np.arange(raw.shape[2], dtype=np.int32),
-            "lat": (("y", "x"), lat2d.values.astype("float32")),
-            "lon": (("y", "x"), lon2d.values.astype("float32")),
+            "y": y_values.astype("float64"),
+            "x": x_values.astype("float64"),
+            "lat": (("y", "x"), lat2d.values.astype("float64")),
+            "lon": (("y", "x"), lon2d.values.astype("float64")),
         },
         attrs=dict(ds.attrs),
     )
 
+    crs = CRS.from_user_input(epsg)
+
+    if crs.is_projected:
+        out["x"].attrs.update(
+            {
+                "standard_name": "projection_x_coordinate",
+                "long_name": "x coordinate of projection",
+                "units": "m",
+                "axis": "X",
+            }
+        )
+        out["y"].attrs.update(
+            {
+                "standard_name": "projection_y_coordinate",
+                "long_name": "y coordinate of projection",
+                "units": "m",
+                "axis": "Y",
+            }
+        )
+    else:
+        out["x"].attrs.update(
+            {
+                "standard_name": "longitude",
+                "long_name": "longitude",
+                "units": "degrees_east",
+                "axis": "X",
+            }
+        )
+        out["y"].attrs.update(
+            {
+                "standard_name": "latitude",
+                "long_name": "latitude",
+                "units": "degrees_north",
+                "axis": "Y",
+            }
+        )
+
+    out["lat"].attrs.update(
+        {
+            "standard_name": "latitude",
+            "long_name": lat_attrs.get("long_name", "latitude"),
+            "units": lat_attrs.get("units", "degrees_north"),
+        }
+    )
+    out["lon"].attrs.update(
+        {
+            "standard_name": "longitude",
+            "long_name": lon_attrs.get("long_name", "longitude"),
+            "units": lon_attrs.get("units", "degrees_east"),
+        }
+    )
+
     out[var_name].attrs.update(radar_attrs)
+
+    # overwrite with standardized name
+    out[var_name].attrs["var_name"] = var_name
 
     final_attrs = {
         "long_name": radar_attrs.get("long_name", radar_var),
@@ -226,39 +330,33 @@ def standardize_radar_dataset(
 
     out[var_name].attrs.update(final_attrs)
 
-    out["lat"].attrs.update(
-        {
-            "standard_name": "latitude",
-            "long_name": lat.attrs.get("long_name", "latitude"),
-            "units": lat.attrs.get("units", "degrees_north"),
-        }
-    )
-    out["lon"].attrs.update(
-        {
-            "standard_name": "longitude",
-            "long_name": lon.attrs.get("long_name", "longitude"),
-            "units": lon.attrs.get("units", "degrees_east"),
-        }
-    )
+    input_grid_mapping = da.attrs.get("grid_mapping")
 
-    if "crs" in ds:
+    if input_grid_mapping is not None and input_grid_mapping in ds:
+        out["spatial_ref"] = xr.DataArray(
+            ds[input_grid_mapping].values,
+            attrs=dict(ds[input_grid_mapping].attrs),
+        )
+    elif "spatial_ref" in ds:
+        out["spatial_ref"] = xr.DataArray(
+            ds["spatial_ref"].values,
+            attrs=dict(ds["spatial_ref"].attrs),
+        )
+    elif "crs" in ds:
         out["spatial_ref"] = xr.DataArray(
             ds["crs"].values,
             attrs=dict(ds["crs"].attrs),
         )
-
-        crs = CRS.from_epsg(4326)
-
-        if "grid_mapping_name" not in out["spatial_ref"].attrs:
-            out["spatial_ref"].attrs["grid_mapping_name"] = "latitude_longitude"
-
-        if "crs_wkt" not in out["spatial_ref"].attrs:
-            out["spatial_ref"].attrs["crs_wkt"] = crs.to_wkt()
-
-        if "spatial_ref" not in out["spatial_ref"].attrs:
-            out["spatial_ref"].attrs["spatial_ref"] = crs.to_wkt()
     else:
-        out = add_crs_metadata(out, epsg="EPSG:4326")
+        out = add_crs_metadata(out, epsg=epsg)
+
+    out["spatial_ref"].attrs.setdefault("crs_wkt", crs.to_wkt())
+    out["spatial_ref"].attrs.setdefault("spatial_ref", crs.to_wkt())
+    out["spatial_ref"].attrs.setdefault("epsg_code", epsg)
+    out["spatial_ref"].attrs.setdefault(
+        "grid_mapping_name",
+        "transverse_mercator" if crs.is_projected else "latitude_longitude",
+    )
 
     return out
 
@@ -294,6 +392,7 @@ def load_and_standardize_nc_files(
     nc_files: Iterable[str | Path],
     var_name: str = DEFAULT_VAR_NAME,
     standard_name: str | None = DEFAULT_STANDARD_NAME,
+    epsg: str = "EPSG:4326",
     verbose: bool = True,
     inspect_raw_fn=None,
 ) -> list[xr.Dataset]:
@@ -319,6 +418,7 @@ def load_and_standardize_nc_files(
                 file_path=fp,
                 var_name=var_name,
                 standard_name=standard_name,
+                epsg=epsg,
             )
             standardized.append(std)
         finally:
@@ -685,6 +785,7 @@ def build_radar_zarr_from_nc_files(
         nc_files,
         var_name=var_name,
         standard_name=standard_name,
+        epsg=epsg,
         verbose=verbose,
         inspect_raw_fn=inspect_raw_fn,
     )
